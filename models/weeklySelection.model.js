@@ -1,10 +1,11 @@
 // File: models/weeklySelection.model.js
 
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+// const sequelize = require('../config/database');
 
-const WeeklySelection = sequelize.define('WeeklySelection', {
-  id: {
+module.exports = (sequelize) => {
+  const weeklySelection = sequelize.define('weeklySelection', {
+    id: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
     primaryKey: true,
@@ -27,4 +28,5 @@ const WeeklySelection = sequelize.define('WeeklySelection', {
   timestamps: true
 });
 
-module.exports = WeeklySelection;
+return weeklySelection; 
+}

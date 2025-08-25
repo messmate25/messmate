@@ -1,10 +1,11 @@
 // File: models/weeklyMenu.model.js
 
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+// const sequelize = require('../config/database');
 
-const WeeklyMenu = sequelize.define('WeeklyMenu', {
-  id: {
+module.exports = (sequelize) => {
+  const weeklyMenu = sequelize.define('weeklyMenu', {
+    id: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
     primaryKey: true,
@@ -35,4 +36,5 @@ const WeeklyMenu = sequelize.define('WeeklyMenu', {
   }
 });
 
-module.exports = WeeklyMenu;
+return weeklyMenu; 
+}
