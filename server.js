@@ -75,7 +75,7 @@ app.get("/", (req, res) => {
     await sequelize.authenticate();
     console.log("✅ Database connection established with Azure SQL.");
 
-    await sequelize.sync({ alter: true }); // Keeps schema updated without dropping data
+    // await sequelize.sync({ alter: true }); // Keeps schema updated without dropping data
     console.log("✅ All models synchronized successfully.");
 
     // --- Start Cron Jobs ---
