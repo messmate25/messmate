@@ -79,7 +79,7 @@ app.get("/", (req, res) => {
     console.log("✅ All models synchronized successfully.");
 
     // --- Start Cron Jobs ---
-    // startDefaultMenuJob();
+    startDefaultMenuJob();
     console.log("🕒 Cron job for default menu assignment scheduled.");
 
     // --- Start Express Server ---
