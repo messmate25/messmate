@@ -1,9 +1,6 @@
 // File: controllers/guest.controller.js
 
-const Guest = require('../models/guest.model');
-const MenuItem = require('../models/menuItem.model');
-const MealHistory = require('../models/mealHistory.model');
-const WeeklyMenu = require('../models/weeklyMenu.model');
+const { WeeklyMenu, MenuItem, MealHistory, Guest } = require('../models');
 const { Op } = require('sequelize');
 const qrcode = require('qrcode');
 

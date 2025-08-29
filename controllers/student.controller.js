@@ -1,10 +1,6 @@
 // File: controllers/student.controller.js
 
-const User = require('../models/user.model');
-const WeeklyMenu = require('../models/weeklyMenu.model');
-const MenuItem = require('../models/menuItem.model');
-const WeeklySelection = require('../models/weeklySelection.model');
-const MealHistory = require('../models/mealHistory.model');
+const { User, WeeklyMenu, MenuItem, WeeklySelection, MealHistory } = require('../models');
 const { Op } = require('sequelize');
 const qrcode = require('qrcode');
 

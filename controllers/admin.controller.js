@@ -1,8 +1,6 @@
 // File: controllers/admin.controller.js
 
-const MenuItem = require('../models/menuItem.model');
-const WeeklyMenu = require('../models/weeklyMenu.model');
-const MealHistory = require('../models/mealHistory.model');
+const { WeeklyMenu, MenuItem, MealHistory } = require('../models');
 const Guest = require('../models/guest.model');
 const User = require('../models/user.model');
 const { Op, fn, col } = require('sequelize');
