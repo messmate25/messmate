@@ -1,6 +1,5 @@
 // File: models/index.js
 const createSequelize = require("../config/database");
-
 const UserModel = require("./user.model");
 const MenuItemModel = require("./menuItem.model");
 const WeeklyMenuModel = require("./weeklyMenu.model");
@@ -8,40 +7,31 @@ const WeeklySelectionModel = require("./weeklySelection.model");
 const MealHistoryModel = require("./mealHistory.model");
 const GuestModel = require("./guest.model");
 
-let sequelize;
-let User, MenuItem, WeeklyMenu, WeeklySelection, MealHistory, Guest;
+async function initModels() {
+  const sequelize = await createSequelize();
 
-(async () => {
-  sequelize = await createSequelize();
+  const User = UserModel(sequelize);
+  const MenuItem = MenuItemModel(sequelize);
+  const WeeklyMenu = WeeklyMenuModel(sequelize);
+  const WeeklySelection = WeeklySelectionModel(sequelize);
+  const MealHistory = MealHistoryModel(sequelize);
+  const Guest = GuestModel(sequelize);
 
-  User = UserModel(sequelize);
-  MenuItem = MenuItemModel(sequelize);
-  WeeklyMenu = WeeklyMenuModel(sequelize);
-  WeeklySelection = WeeklySelectionModel(sequelize);
-  MealHistory = MealHistoryModel(sequelize);
-  Guest = GuestModel(sequelize);
-
+  // Associations
   MenuItem.hasMany(WeeklyMenu, { foreignKey: "menuItemId" });
-    WeeklyMenu.belongsTo(MenuItem, { foreignKey: "menuItemId" });
+  WeeklyMenu.belongsTo(MenuItem, { foreignKey: "menuItemId" });
 
-    // Weekly Selection <-> User & Menu Item
-    User.hasMany(WeeklySelection, { foreignKey: "userId" });
-    WeeklySelection.belongsTo(User, { foreignKey: "userId" });
-    MenuItem.hasMany(WeeklySelection, { foreignKey: "menuItemId" });
-    WeeklySelection.belongsTo(MenuItem, { foreignKey: "menuItemId" });
+  User.hasMany(WeeklySelection, { foreignKey: "userId" });
+  WeeklySelection.belongsTo(User, { foreignKey: "userId" });
+  MenuItem.hasMany(WeeklySelection, { foreignKey: "menuItemId" });
+  WeeklySelection.belongsTo(MenuItem, { foreignKey: "menuItemId" });
 
-    // Meal History <-> User & Guest
-    User.hasMany(MealHistory, { foreignKey: "userId" });
-    MealHistory.belongsTo(User, { foreignKey: "userId" });
-    Guest.hasMany(MealHistory, { foreignKey: "guestId" });
-    MealHistory.belongsTo(Guest, { foreignKey: "guestId" });
+  User.hasMany(MealHistory, { foreignKey: "userId" });
+  MealHistory.belongsTo(User, { foreignKey: "userId" });
+  Guest.hasMany(MealHistory, { foreignKey: "guestId" });
+  MealHistory.belongsTo(Guest, { foreignKey: "guestId" });
 
+  return { sequelize, User, Guest };
+}
 
-  // associations can go here if needed
-})();
-
-module.exports = {
-  get User() { return User; },
-  get Guest() { return Guest; },
-  get sequelize() { return sequelize; }
-};
+module.exports = initModels;
