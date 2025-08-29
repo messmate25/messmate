@@ -21,6 +21,22 @@ let User, MenuItem, WeeklyMenu, WeeklySelection, MealHistory, Guest;
   MealHistory = MealHistoryModel(sequelize);
   Guest = GuestModel(sequelize);
 
+  MenuItem.hasMany(WeeklyMenu, { foreignKey: "menuItemId" });
+    WeeklyMenu.belongsTo(MenuItem, { foreignKey: "menuItemId" });
+
+    // Weekly Selection <-> User & Menu Item
+    User.hasMany(WeeklySelection, { foreignKey: "userId" });
+    WeeklySelection.belongsTo(User, { foreignKey: "userId" });
+    MenuItem.hasMany(WeeklySelection, { foreignKey: "menuItemId" });
+    WeeklySelection.belongsTo(MenuItem, { foreignKey: "menuItemId" });
+
+    // Meal History <-> User & Guest
+    User.hasMany(MealHistory, { foreignKey: "userId" });
+    MealHistory.belongsTo(User, { foreignKey: "userId" });
+    Guest.hasMany(MealHistory, { foreignKey: "guestId" });
+    MealHistory.belongsTo(Guest, { foreignKey: "guestId" });
+
+
   // associations can go here if needed
 })();
 
