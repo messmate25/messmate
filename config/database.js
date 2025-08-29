@@ -30,7 +30,7 @@ async function createSequelize() {
           encrypt: true, // Required for Azure SQL
         },
       },
-      logging: false, // Disable logging; set true for debugging
+      logging: true, // Disable logging; set true for debugging
     });
 
     return sequelize;

@@ -1,20 +1,25 @@
 // File: controllers/auth.controller.js
 
-const {User, Guest} = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
+/**
+ * Helper to get initialized models from request
+ */
+const getModels = (req) => req.app.locals.models;
 
 // --- User Registration ---
 exports.register = async (req, res) => {
   try {
     const { name, email, password, room_no, role } = req.body;
+    const { User } = getModels(req);
 
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(409).json({ message: 'Email is already registered.' });
-    } 
-    console.log('Registering user with email:', email);
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const newUser = await User.create({
@@ -22,9 +27,9 @@ exports.register = async (req, res) => {
       email,
       password: hashedPassword,
       room_no,
-      role: role || 'student' // Default to student if role is not provided
+      role: role || 'student'
     });
-    console.log('User created with ID:', newUser.id);
+
     res.status(201).json({
       message: 'User registered successfully!',
       userId: newUser.id,
@@ -39,6 +44,7 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const { User } = getModels(req);
 
     const user = await User.findOne({ where: { email } });
     if (!user) {
@@ -67,22 +73,23 @@ exports.login = async (req, res) => {
 exports.guestSignup = async (req, res) => {
   try {
     const { name, mobile_number } = req.body;
+    const { Guest } = getModels(req);
+
     if (!name || !mobile_number) {
       return res.status(400).json({ message: 'Name and mobile number are required.' });
     }
 
     const [guest, created] = await Guest.findOrCreate({
-      where: { mobile_number: mobile_number },
-      defaults: { name: name }
+      where: { mobile_number },
+      defaults: { name }
     });
 
     if (!created && guest.name !== name) {
-        guest.name = name;
-        await guest.save();
+      guest.name = name;
+      await guest.save();
     }
 
-    const mockOtp = "123456";
-
+    const mockOtp = "123456"; // mock OTP
     res.status(200).json({
       message: 'OTP sent successfully (mock).',
       otp: mockOtp
@@ -97,12 +104,13 @@ exports.guestSignup = async (req, res) => {
 exports.guestVerifyOTP = async (req, res) => {
   try {
     const { mobile_number, otp } = req.body;
+    const { Guest } = getModels(req);
 
     if (otp !== "123456") {
       return res.status(400).json({ message: 'Invalid OTP.' });
     }
 
-    const guest = await Guest.findOne({ where: { mobile_number: mobile_number } });
+    const guest = await Guest.findOne({ where: { mobile_number } });
     if (!guest) {
       return res.status(404).json({ message: 'Guest not found. Please sign up first.' });
     }

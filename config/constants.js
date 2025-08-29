@@ -13,5 +13,5 @@ module.exports = {
   AZURE_SQL_SCOPE: "https://database.windows.net/.default",
 
   // Server
-  PORT: process.env.PORT || 3000,
+  PORT: process.env.PORT || 8080,
 };

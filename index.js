@@ -35,7 +35,10 @@
   (async () => {
     try {
 
-      const { sequelize } = await initModels();
+      const { sequelize  , User, Guest, MenuItem, WeeklyMenu, WeeklySelection, MealHistory} = await initModels();
+
+      app.locals.models = { User, Guest , MenuItem, WeeklyMenu, WeeklySelection, MealHistory};
+
       await sequelize.authenticate();
       console.log("✅ Database connected successfully.");
       startDefaultMenuJob();

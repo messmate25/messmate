@@ -31,7 +31,7 @@ async function initModels() {
   Guest.hasMany(MealHistory, { foreignKey: "guestId" });
   MealHistory.belongsTo(Guest, { foreignKey: "guestId" });
 
-  return { sequelize, User, Guest };
+  return { sequelize, User, Guest , MenuItem, WeeklyMenu, WeeklySelection, MealHistory };
 }
 
 module.exports = initModels;
