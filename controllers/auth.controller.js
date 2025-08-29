@@ -13,8 +13,8 @@ exports.register = async (req, res) => {
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(409).json({ message: 'Email is already registered.' });
-    }
-
+    } 
+    console.log('Registering user with email:', email);
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const newUser = await User.create({
@@ -24,7 +24,7 @@ exports.register = async (req, res) => {
       room_no,
       role: role || 'student' // Default to student if role is not provided
     });
-
+    console.log('User created with ID:', newUser.id);
     res.status(201).json({
       message: 'User registered successfully!',
       userId: newUser.id,
