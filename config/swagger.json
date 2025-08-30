@@ -7,8 +7,8 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8080",
-      "description": "Local server"
+      "url": "https://messapp-dkfffueseegwexf9.centralindia-01.azurewebsites.net",
+      "description": "Prod Server"
     }
   ],
   "components": {
