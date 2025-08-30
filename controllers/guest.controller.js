@@ -1,12 +1,17 @@
 // File: controllers/guest.controller.js
 
-const { WeeklyMenu, MenuItem, MealHistory, Guest } = require('../models');
 const { Op } = require('sequelize');
 const qrcode = require('qrcode');
+
+/**
+ * Helper to get initialized models from request
+ */
+const getModels = (req) => req.app.locals.models;
 
 // --- Get Full Weekly Menu (for Guests) ---
 exports.getWeeklyMenu = async (req, res) => {
   try {
+    const { WeeklyMenu, MenuItem } = getModels(req);
     const { week_start_date } = req.query;
 
     if (!week_start_date) {
@@ -15,9 +20,7 @@ exports.getWeeklyMenu = async (req, res) => {
 
     // Guests can see all Thalis offered during the week
     const menu = await WeeklyMenu.findAll({
-      where: {
-        week_start_date: week_start_date,
-      },
+      where: { week_start_date },
       include: [{
         model: MenuItem,
         attributes: ['id', 'name', 'estimated_prep_time', 'extra_price']
@@ -32,10 +35,10 @@ exports.getWeeklyMenu = async (req, res) => {
     const uniqueThalis = [];
     const seenIds = new Set();
     for (const item of menu) {
-        if (!seenIds.has(item.MenuItem.id)) {
-            uniqueThalis.push(item.MenuItem);
-            seenIds.add(item.MenuItem.id);
-        }
+      if (!seenIds.has(item.MenuItem.id)) {
+        uniqueThalis.push(item.MenuItem);
+        seenIds.add(item.MenuItem.id);
+      }
     }
 
     res.status(200).json(uniqueThalis);
@@ -48,6 +51,7 @@ exports.getWeeklyMenu = async (req, res) => {
 // --- Place an order for a meal ---
 exports.placeOrder = async (req, res) => {
   try {
+    const { Guest, MenuItem, MealHistory } = getModels(req);
     const guestId = req.user.id;
     const { menuItemId, meal_date, meal_type } = req.body;
 
@@ -57,7 +61,7 @@ exports.placeOrder = async (req, res) => {
 
     const guest = await Guest.findByPk(guestId);
     if (!guest) {
-        return res.status(404).json({ message: 'Guest profile not found.' });
+      return res.status(404).json({ message: 'Guest profile not found.' });
     }
 
     const menuItem = await MenuItem.findByPk(menuItemId);
@@ -68,7 +72,11 @@ exports.placeOrder = async (req, res) => {
     const totalCost = parseFloat(menuItem.extra_price);
 
     if (parseFloat(guest.wallet_balance) < totalCost) {
-      return res.status(402).json({ message: 'Insufficient wallet balance.', required: totalCost, balance: guest.wallet_balance });
+      return res.status(402).json({
+        message: 'Insufficient wallet balance.',
+        required: totalCost,
+        balance: guest.wallet_balance
+      });
     }
 
     guest.wallet_balance = parseFloat(guest.wallet_balance) - totalCost;
@@ -77,15 +85,15 @@ exports.placeOrder = async (req, res) => {
     const qrPayload = {
       guestId: guest.id,
       name: guest.name,
-      meal_date: meal_date,
-      meal_type: meal_type,
+      meal_date,
+      meal_type,
       items: [{ id: menuItem.id, name: menuItem.name }] // Guest order is a single Thali
     };
 
     await MealHistory.create({
       guestId: guest.id,
-      meal_date: meal_date,
-      meal_type: meal_type,
+      meal_date,
+      meal_type,
       total_cost: totalCost,
       qr_code_data: JSON.stringify(qrPayload),
       scanned_at: new Date()
