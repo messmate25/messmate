@@ -13,6 +13,9 @@
   const adminRoutes = require("./routes/admin.routes");
   const guestRoutes = require("./routes/guest.routes");
 
+  const swaggerUi = require('swagger-ui-express');
+  const swaggerSpec = require('./config/swagger.config');
+
   const app = express();
 
   // --- Middleware ---
@@ -25,6 +28,9 @@
   app.use("/api/student", studentRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/guest", guestRoutes);
+
+  // --- Swagger Docs ---
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   // Health check
   app.get("/", (req, res) => {
