@@ -14,7 +14,7 @@
   const guestRoutes = require("./routes/guest.routes");
 
   const swaggerUi = require('swagger-ui-express');
-  const swaggerSpec = require('./config/swagger.config');
+  const swaggerSpec = require('./config/swagger.json');
 
   const app = express();
 

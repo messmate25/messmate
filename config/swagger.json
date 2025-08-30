@@ -1,0 +1,293 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Mess Food Management API",
+    "version": "1.0.0",
+    "description": "API documentation for Mess Food Management System (Auth, Student, Admin, Guest)."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "summary": "Register a new user (student/admin)",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "password": { "type": "string" },
+                  "room_no": { "type": "string" },
+                  "role": { "type": "string", "enum": ["student", "admin", "superadmin"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User registered successfully" },
+          "409": { "description": "Email already registered" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Login user (student/admin/superadmin)",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful, returns JWT token" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/auth/guest/signup": {
+      "post": {
+        "summary": "Guest signup (request OTP)",
+        "tags": ["Auth - Guest"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "mobile_number": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OTP sent (mock)" }
+        }
+      }
+    },
+    "/api/auth/guest/verify": {
+      "post": {
+        "summary": "Guest login (verify OTP)",
+        "tags": ["Auth - Guest"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mobile_number": { "type": "string" },
+                  "otp": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Guest login successful, returns JWT token" },
+          "400": { "description": "Invalid OTP" }
+        }
+      }
+    },
+
+    "/api/student/profile": {
+      "get": {
+        "summary": "Get student profile",
+        "tags": ["Student"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Student profile" } }
+      }
+    },
+    "/api/student/weekly-menu": {
+      "get": {
+        "summary": "Get weekly menu (student)",
+        "tags": ["Student"],
+        "parameters": [
+          { "in": "query", "name": "week_start_date", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Weekly menu grouped by day and meal" } }
+      }
+    },
+    "/api/student/weekly-selection/preview": {
+      "post": {
+        "summary": "Preview weekly selection costs",
+        "tags": ["Student"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "selections": { "type": "array", "items": { "type": "object" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Cost preview returned" } }
+      }
+    },
+    "/api/student/weekly-selection": {
+      "post": {
+        "summary": "Submit weekly menu selection",
+        "tags": ["Student"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object" } } }
+        },
+        "responses": { "201": { "description": "Weekly selection saved" } }
+      }
+    },
+    "/api/student/meal-qr": {
+      "get": {
+        "summary": "Generate QR code for a meal",
+        "tags": ["Student"],
+        "parameters": [
+          { "in": "query", "name": "meal_date", "required": true, "schema": { "type": "string", "format": "date" } },
+          { "in": "query", "name": "meal_type", "required": true, "schema": { "type": "string", "enum": ["breakfast","lunch","dinner"] } }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "QR code generated" } }
+      }
+    },
+    "/api/student/usage-stats": {
+      "get": {
+        "summary": "Get monthly usage stats",
+        "tags": ["Student"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Usage statistics" } }
+      }
+    },
+
+    "/api/admin/weekly-menu": {
+      "post": {
+        "summary": "Set weekly menu (Super Admin only)",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "201": { "description": "Weekly menu set" } }
+      }
+    },
+    "/api/admin/dashboard": {
+      "get": {
+        "summary": "Get dashboard stats",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Dashboard stats returned" } }
+      }
+    },
+    "/api/admin/menu-items": {
+      "post": {
+        "summary": "Add a menu item",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "201": { "description": "Menu item added" } }
+      }
+    },
+    "/api/admin/scan-qr": {
+      "post": {
+        "summary": "Scan and validate meal QR",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Meal verified" } }
+      }
+    },
+    "/api/admin/guest/recharge": {
+      "post": {
+        "summary": "Recharge guest wallet",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Wallet recharged" } }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "summary": "Get all users (students + guests)",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Users returned" } }
+      }
+    },
+    "/api/admin/users/{userId}": {
+      "get": {
+        "summary": "Get user by ID",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "in": "path", "name": "userId", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "User found" }, "404": { "description": "User not found" } }
+      },
+      "delete": {
+        "summary": "Delete user by ID",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "in": "path", "name": "userId", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "User deleted" }, "409": { "description": "FK constraint error" } }
+      }
+    },
+
+    "/api/guest/weekly-menu": {
+      "get": {
+        "summary": "Get weekly menu (guest)",
+        "tags": ["Guest"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "in": "query", "name": "week_start_date", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "Weekly menu for guest" } }
+      }
+    },
+    "/api/guest/order": {
+      "post": {
+        "summary": "Place an order (guest)",
+        "tags": ["Guest"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Order placed successfully" }, "402": { "description": "Insufficient balance" } }
+      }
+    }
+  }
+}
