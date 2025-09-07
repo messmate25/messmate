@@ -12,7 +12,6 @@ const superAdminMiddleware = require('../middleware/superAdmin.middleware');
 // Middleware arrays for different levels of access
 const protectedAdminRoute = [authMiddleware, adminMiddleware];
 const protectedSuperAdminRoute = [authMiddleware, superAdminMiddleware];
-
 // --- Super Admin Routes ---
 router.post('/weekly-menu', protectedSuperAdminRoute, adminController.setWeeklyMenu);
 
