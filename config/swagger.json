@@ -144,6 +144,12 @@
         "properties": {
           "id": { "type": "integer" },
           "name": { "type": "string" },
+          "description": { "type": "string" },
+          "image_url": { 
+            "type": "string", 
+            "format": "uri", 
+            "description": "URL to the menu item image" 
+          },
           "estimated_prep_time": { "type": "integer", "description": "Minutes" },
           "monthly_limit": { "type": "integer" },
           "extra_price": { "type": "number", "format": "float" }
