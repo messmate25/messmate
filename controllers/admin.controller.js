@@ -146,7 +146,7 @@ exports.scanMealQR = async (req, res) => {
 // --- User Management ---
 exports.getAllUsers = async (req, res) => {
   try {
-    const { User, Guest  } = getModels(req);
+    const { User, Guest } = getModels(req);
 
     const students = await User.findAll({
       where: { role: 'student' },
@@ -158,7 +158,7 @@ exports.getAllUsers = async (req, res) => {
     });
 
     const admins = await User.findAll({
-      where: { role:'admin' } ,
+      where: { role: ['admin', 'super_admin'] }, // Sequelize auto converts to IN()
       attributes: ['id', 'name', 'email', 'room_no', 'role']
     });
 
