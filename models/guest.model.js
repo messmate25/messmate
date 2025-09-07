@@ -31,7 +31,12 @@ module.exports = (sequelize) => {
     otp_expires_at: {
       type: DataTypes.DATE,
       allowNull: true
-    }
+    },
+    role: {
+      type: DataTypes.ENUM('guest'),
+      allowNull: false,
+      defaultValue: 'guest'
+    },
   }, {
     tableName: 'guests',
     timestamps: true
