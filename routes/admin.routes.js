@@ -16,12 +16,12 @@ const protectedSuperAdminRoute = [authMiddleware, superAdminMiddleware];
 router.post('/weekly-menu', protectedSuperAdminRoute, adminController.setWeeklyMenu);
 
 // --- Admin & Super Admin Routes ---
-router.get('/dashboard', protectedAdminRoute,protectedSuperAdminRoute, adminController.getDashboardStats);
-router.post('/menu-items', protectedAdminRoute,protectedSuperAdminRoute, adminController.addMenuItem);
-router.post('/scan-qr', protectedAdminRoute,protectedSuperAdminRoute, adminController.scanMealQR);
-router.post('/guest/recharge', protectedAdminRoute,protectedSuperAdminRoute, adminController.rechargeGuestWallet);
-router.get('/users', protectedAdminRoute,protectedSuperAdminRoute, adminController.getAllUsers);
-router.get('/users/:userId', protectedAdminRoute,protectedSuperAdminRoute, adminController.getUserById);
-router.delete('/users/:userId', protectedAdminRoute, protectedSuperAdminRoute,adminController.deleteUser);
+router.get('/dashboard', protectedAdminRoute, adminController.getDashboardStats);
+router.post('/menu-items', protectedAdminRoute, adminController.addMenuItem);
+router.post('/scan-qr', protectedAdminRoute, adminController.scanMealQR);
+router.post('/guest/recharge', protectedAdminRoute, adminController.rechargeGuestWallet);
+router.get('/users', protectedAdminRoute, adminController.getAllUsers);
+router.get('/users/:userId', protectedAdminRoute, adminController.getUserById);
+router.delete('/users/:userId', protectedAdminRoute, adminController.deleteUser);
 
 module.exports = router;
