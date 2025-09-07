@@ -169,11 +169,20 @@
 
       "WeeklyMenuEntry": {
         "type": "object",
-        "required": ["day_of_week", "meal_type", "menuItemId"],
+        "required": ["day_of_week", "meal_type", "menuItemId", "imageUrl"],
         "properties": {
           "day_of_week": { "$ref": "#/components/schemas/DayOfWeek" },
           "meal_type": { "$ref": "#/components/schemas/MealType" },
-          "menuItemId": { "type": "integer" }
+          "menuItemId": { "type": "integer" },
+          "description": {
+            "type": "string",
+            "description": "Short description of the meal"
+          },
+          "imageUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the meal image"
+          }
         }
       },
       "SetWeeklyMenuRequest": {
