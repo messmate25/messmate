@@ -157,6 +157,10 @@ exports.getAllUsers = async (req, res) => {
       attributes: ['id', 'name', 'mobile_number', 'wallet_balance']
     });
 
+    const admins = await User.findAll({
+      where: { role: { [Op.in]: ['admin', 'super_admin'] } },
+      attributes: ['id', 'name', 'email', 'room_no', 'role']
+    });
     res.status(200).json({ students, guests });
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
