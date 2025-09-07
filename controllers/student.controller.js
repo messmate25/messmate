@@ -42,7 +42,7 @@ exports.getWeeklyMenu = async (req, res) => {
       where: { week_start_date },
       include: [{
         model: MenuItem,
-        attributes: ['id', 'name', 'extra_price']
+        attributes: ['id', 'name', 'description', 'image_url', 'extra_price']
       }],
       order: [['day_of_week'], ['meal_type']]
     });
@@ -127,7 +127,7 @@ exports.generateMealQR = async (req, res) => {
 
     const selection = await WeeklySelection.findOne({
       where: { userId, meal_date, meal_type },
-      include: [{ model: MenuItem, attributes: ['id', 'name'] }]
+      include: [{ model: MenuItem, attributes: ['id', 'name', 'description', 'image_url'] }]
     });
 
     if (!selection) {
@@ -139,7 +139,12 @@ exports.generateMealQR = async (req, res) => {
       userName: req.user.name,
       meal_date,
       meal_type,
-      items: [{ id: selection.MenuItem.id, name: selection.MenuItem.name }]
+      items: [{
+        id: selection.MenuItem.id,
+        name: selection.MenuItem.name,
+        description: selection.MenuItem.description,
+        image_url: selection.MenuItem.image_url
+      }]
     };
 
     const qrCodeDataURL = await qrcode.toDataURL(JSON.stringify(qrPayload));

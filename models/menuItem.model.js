@@ -17,6 +17,16 @@ module.exports = (sequelize) => {
       unique: true,
       comment: 'The name of the Thali'
     },
+    description: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: 'Description of the Thali or meal'
+    },
+    image_url: {
+      type: DataTypes.STRING(1000),
+      allowNull: true,
+      comment: 'Public URL of the meal image (stored in Azure Blob)'
+    },
     estimated_prep_time: {
       type: DataTypes.INTEGER,
       allowNull: false,
