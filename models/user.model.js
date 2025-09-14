@@ -35,6 +35,11 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: 'student'
     },
+    wallet_balance: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.00
+    }
   }, {
     tableName: 'users',
     timestamps: true

@@ -22,6 +22,9 @@ router.post('/weekly-selection/preview', studentController.previewWeeklySelectio
 // POST /api/student/weekly-selection
 router.post('/weekly-selection', studentController.submitWeeklySelection);
 
+// 👉 NEW: GET /api/student/weekly-selections (Cart View)
+router.get('/weekly-selections', studentController.getWeeklySelections);
+
 // GET /api/student/meal-qr
 router.get('/meal-qr', studentController.generateMealQR);
 

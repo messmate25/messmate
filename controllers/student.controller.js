@@ -70,7 +70,7 @@ exports.getWeeklyMenu = async (req, res) => {
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
-    const { WeeklySelection } = getModels(req);
+    const { WeeklySelection, MealHistory, MenuItem, User } = getModels(req);
     const userId = req.user.id;
     const { selections, week_start_date } = req.body;
 
@@ -78,7 +78,7 @@ exports.submitWeeklySelection = async (req, res) => {
       return res.status(400).json({ message: 'Please provide selections and the week start date.' });
     }
 
-    // Validation: Ensure only one Thali is selected per meal
+    // ✅ Validation: only one thali per meal
     const selectionsByDayMeal = {};
     for (const s of selections) {
       const key = `${s.meal_date}-${s.meal_type}`;
@@ -93,10 +93,7 @@ exports.submitWeeklySelection = async (req, res) => {
     endDate.setDate(startDate.getDate() + 6);
 
     await WeeklySelection.destroy({
-      where: {
-        userId,
-        meal_date: { [Op.between]: [startDate, endDate] }
-      }
+      where: { userId, meal_date: { [Op.between]: [startDate, endDate] } }
     });
 
     const newSelections = selections.map(selection => ({
@@ -107,8 +104,45 @@ exports.submitWeeklySelection = async (req, res) => {
 
     await WeeklySelection.bulkCreate(newSelections);
 
-    res.status(201).json({ message: 'Your weekly menu has been saved successfully!' });
+    // ✅ Check extra charges
+    let totalExtraCharge = 0;
+    for (const s of selections) {
+      const menuItem = await MenuItem.findByPk(s.menuItemId);
+      if (menuItem && menuItem.extra_price) {
+        totalExtraCharge += parseFloat(menuItem.extra_price);
+      }
+    }
 
+    if (totalExtraCharge > 0) {
+      // ✅ Check user balance
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+
+      if (parseFloat(user.wallet_balance) < totalExtraCharge) {
+        return res.status(400).json({ 
+          message: 'Insufficient wallet balance. Please recharge your wallet.' 
+        });
+      }
+
+      // ✅ Deduct from wallet
+      user.wallet_balance = parseFloat(user.wallet_balance) - totalExtraCharge;
+      await user.save();
+
+      // ✅ Log in MealHistory
+      await MealHistory.create({
+        userId,
+        transaction_type: 'debit',
+        amount: totalExtraCharge,
+        remarks: 'Weekly selection extra charges'
+      });
+    }
+
+    res.status(201).json({
+      message: 'Your weekly menu has been saved successfully!',
+      total_extra_charge: totalExtraCharge
+    });
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
@@ -264,5 +298,43 @@ exports.previewWeeklySelection = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};
+
+// GET /student/weekly-selections
+exports.getWeeklySelections = async (req, res) =>{
+  try {
+    const userId = req.user.id;
+
+    // Get start of week (Monday) and end of week (Sunday)
+    const today = new Date();
+    const day = today.getDay(); // 0 = Sunday
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const selections = await req.models.WeeklySelection.findAll({
+      where: {
+        userId,
+        meal_date: {
+          [req.models.sequelize.Op.between]: [monday, sunday],
+        },
+      },
+      include: [
+        { model: req.models.MenuItem, attributes: ["id", "name", "image_url", "extra_price"] }
+      ],
+      order: [["meal_date", "ASC"], ["meal_type", "ASC"]],
+    });
+
+    return res.json({
+      week_start: monday,
+      week_end: sunday,
+      selections,
+    });
+  } catch (err) {
+    console.error("getWeeklySelections error:", err);
+    return res.status(500).json({ error: "Failed to fetch weekly selections" });
   }
 };
