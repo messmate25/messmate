@@ -6,6 +6,7 @@ const WeeklyMenuModel = require("./weeklyMenu.model");
 const WeeklySelectionModel = require("./weeklySelection.model");
 const MealHistoryModel = require("./mealHistory.model");
 const GuestModel = require("./guest.model");
+const TransactionModel = require("./transaction.model");   // ✅
 
 async function initModels() {
   const sequelize = await createSequelize();
@@ -16,22 +17,40 @@ async function initModels() {
   const WeeklySelection = WeeklySelectionModel(sequelize);
   const MealHistory = MealHistoryModel(sequelize);
   const Guest = GuestModel(sequelize);
+  const Transaction = TransactionModel(sequelize);   // ✅
 
-  // Associations
+  // --- Associations ---
+
+  // Menu <-> WeeklyMenu
   MenuItem.hasMany(WeeklyMenu, { foreignKey: "menuItemId" });
   WeeklyMenu.belongsTo(MenuItem, { foreignKey: "menuItemId" });
 
+  // User <-> WeeklySelection
   User.hasMany(WeeklySelection, { foreignKey: "userId" });
   WeeklySelection.belongsTo(User, { foreignKey: "userId" });
   MenuItem.hasMany(WeeklySelection, { foreignKey: "menuItemId" });
   WeeklySelection.belongsTo(MenuItem, { foreignKey: "menuItemId" });
 
+  // User/Guest <-> MealHistory
   User.hasMany(MealHistory, { foreignKey: "userId" });
   MealHistory.belongsTo(User, { foreignKey: "userId" });
   Guest.hasMany(MealHistory, { foreignKey: "guestId" });
   MealHistory.belongsTo(Guest, { foreignKey: "guestId" });
 
-  return { sequelize, User, Guest , MenuItem, WeeklyMenu, WeeklySelection, MealHistory };
+  // WeeklySelection <-> MealHistory (link scanned QR back to selection)
+  WeeklySelection.hasMany(MealHistory, { foreignKey: "weekly_selection_id" });
+  MealHistory.belongsTo(WeeklySelection, { foreignKey: "weekly_selection_id" });
+
+  // User <-> Transaction
+  User.hasMany(Transaction, { foreignKey: "userId" });
+  Transaction.belongsTo(User, { foreignKey: "userId" });
+
+  return { 
+    sequelize, 
+    User, Guest, 
+    MenuItem, WeeklyMenu, WeeklySelection, 
+    MealHistory, Transaction   // ✅ include new model
+  };
 }
 
 module.exports = initModels;
