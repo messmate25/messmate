@@ -27,55 +27,116 @@
       "ErrorResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "error": { "type": "string" }
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
         }
       },
-
       "MealType": {
         "type": "string",
-        "enum": ["breakfast", "lunch", "dinner"]
+        "enum": [
+          "breakfast",
+          "lunch",
+          "dinner"
+        ]
       },
       "DayOfWeek": {
         "type": "string",
-        "enum": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+        "enum": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ]
       },
-
       "User": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "room_no": { "type": "string" },
-          "role": { "type": "string", "enum": ["student", "admin", "super_admin"] }
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "room_no": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "student",
+              "admin",
+              "super_admin"
+            ]
+          }
         }
       },
       "RegisterRequest": {
         "type": "object",
-        "required": ["name", "email", "password"],
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "password": { "type": "string" },
-          "room_no": { "type": "string" },
-          "role": { "type": "string", "enum": ["student","admin","super_admin"] }
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          },
+          "room_no": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "student",
+              "admin",
+              "super_admin"
+            ]
+          }
         }
       },
       "RegisterResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "userId": { "type": "integer" }
+          "message": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer"
+          }
         }
       },
-
       "LoginRequest": {
         "type": "object",
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "properties": {
-          "email": { "type": "string", "format": "email" },
-          "password": { "type": "string" }
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
         }
       },
       "LoginResponse": {
@@ -84,102 +145,186 @@
           "result": {
             "type": "object",
             "properties": {
-              "id": { "type": "integer" },
-              "role": { "type": "string" }
+              "id": {
+                "type": "integer"
+              },
+              "role": {
+                "type": "string"
+              }
             }
           },
-          "token": { "type": "string" }
+          "token": {
+            "type": "string"
+          }
         }
       },
-
       "Guest": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "mobile_number": { "type": "string" },
-          "wallet_balance": { "type": "number", "format": "float" }
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "mobile_number": {
+            "type": "string"
+          },
+          "wallet_balance": {
+            "type": "number",
+            "format": "float"
+          }
         }
       },
       "GuestSignupRequest": {
         "type": "object",
-        "required": ["name", "mobile_number"],
+        "required": [
+          "name",
+          "mobile_number"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "mobile_number": { "type": "string" }
+          "name": {
+            "type": "string"
+          },
+          "mobile_number": {
+            "type": "string"
+          }
         }
       },
       "GuestSignupResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "otp": { "type": "string" }
+          "message": {
+            "type": "string"
+          },
+          "otp": {
+            "type": "string"
+          }
         }
       },
       "GuestVerifyRequest": {
         "type": "object",
-        "required": ["mobile_number", "otp"],
+        "required": [
+          "mobile_number",
+          "otp"
+        ],
         "properties": {
-          "mobile_number": { "type": "string" },
-          "otp": { "type": "string" }
+          "mobile_number": {
+            "type": "string"
+          },
+          "otp": {
+            "type": "string"
+          }
         }
       },
       "GuestVerifyResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
+          "message": {
+            "type": "string"
+          },
           "result": {
             "type": "object",
             "properties": {
-              "id": { "type": "integer" },
-              "role": { "type": "string", "enum": ["guest"] }
+              "id": {
+                "type": "integer"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "guest"
+                ]
+              }
             }
           },
-          "token": { "type": "string" }
+          "token": {
+            "type": "string"
+          }
         }
       },
-
       "MenuItem": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "description": { "type": "string" },
-          "image_url": { 
-            "type": "string", 
-            "format": "uri", 
-            "description": "URL to the menu item image" 
+          "id": {
+            "type": "integer"
           },
-          "estimated_prep_time": { "type": "integer", "description": "Minutes" },
-          "monthly_limit": { "type": "integer" },
-          "extra_price": { "type": "number", "format": "float" }
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "image_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the menu item image"
+          },
+          "estimated_prep_time": {
+            "type": "integer",
+            "description": "Minutes"
+          },
+          "monthly_limit": {
+            "type": "integer"
+          },
+          "extra_price": {
+            "type": "number",
+            "format": "float"
+          }
         }
       },
       "MenuItemCreateRequest": {
         "type": "object",
-        "required": ["name", "estimated_prep_time", "monthly_limit", "extra_price"],
+        "required": [
+          "name",
+          "estimated_prep_time",
+          "monthly_limit",
+          "extra_price"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "estimated_prep_time": { "type": "integer" },
-          "monthly_limit": { "type": "integer" },
-          "extra_price": { "type": "number", "format": "float" }
+          "name": {
+            "type": "string"
+          },
+          "estimated_prep_time": {
+            "type": "integer"
+          },
+          "monthly_limit": {
+            "type": "integer"
+          },
+          "extra_price": {
+            "type": "number",
+            "format": "float"
+          }
         }
       },
       "MenuItemCreateResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "item": { "$ref": "#/components/schemas/MenuItem" }
+          "message": {
+            "type": "string"
+          },
+          "item": {
+            "$ref": "#/components/schemas/MenuItem"
+          }
         }
       },
-
       "WeeklyMenuEntry": {
         "type": "object",
-        "required": ["day_of_week", "meal_type", "menuItemId", "imageUrl"],
+        "required": [
+          "day_of_week",
+          "meal_type",
+          "menuItemId",
+          "imageUrl"
+        ],
         "properties": {
-          "day_of_week": { "$ref": "#/components/schemas/DayOfWeek" },
-          "meal_type": { "$ref": "#/components/schemas/MealType" },
-          "menuItemId": { "type": "integer" },
+          "day_of_week": {
+            "$ref": "#/components/schemas/DayOfWeek"
+          },
+          "meal_type": {
+            "$ref": "#/components/schemas/MealType"
+          },
+          "menuItemId": {
+            "type": "integer"
+          },
           "description": {
             "type": "string",
             "description": "Short description of the meal"
@@ -193,161 +338,270 @@
       },
       "SetWeeklyMenuRequest": {
         "type": "object",
-        "required": ["week_start_date", "menu"],
+        "required": [
+          "week_start_date",
+          "menu"
+        ],
         "properties": {
-          "week_start_date": { "type": "string", "format": "date" },
+          "week_start_date": {
+            "type": "string",
+            "format": "date"
+          },
           "menu": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/WeeklyMenuEntry" }
+            "items": {
+              "$ref": "#/components/schemas/WeeklyMenuEntry"
+            }
           }
         }
       },
       "SetWeeklyMenuResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" }
+          "message": {
+            "type": "string"
+          }
         }
       },
-
       "StudentWeeklyMenuResponse": {
         "type": "object",
         "additionalProperties": {
           "type": "object",
           "properties": {
-            "breakfast": { "type": "array", "items": { "$ref": "#/components/schemas/MenuItem" } },
-            "lunch": { "type": "array", "items": { "$ref": "#/components/schemas/MenuItem" } },
-            "dinner": { "type": "array", "items": { "$ref": "#/components/schemas/MenuItem" } }
+            "breakfast": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/MenuItem"
+              }
+            },
+            "lunch": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/MenuItem"
+              }
+            },
+            "dinner": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/MenuItem"
+              }
+            }
           }
         },
         "description": "Map: day_of_week -> { meal_type: MenuItem[] }"
       },
       "GuestWeeklyMenuResponse": {
         "type": "array",
-        "items": { "$ref": "#/components/schemas/MenuItem" }
+        "items": {
+          "$ref": "#/components/schemas/MenuItem"
+        }
       },
-
       "WeeklySelectionItem": {
         "type": "object",
-        "required": ["meal_date", "meal_type", "menuItemId"],
+        "required": [
+          "meal_date",
+          "meal_type",
+          "menuItemId"
+        ],
         "properties": {
-          "meal_date": { "type": "string", "format": "date" },
-          "meal_type": { "$ref": "#/components/schemas/MealType" },
-          "menuItemId": { "type": "integer" }
+          "meal_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "meal_type": {
+            "$ref": "#/components/schemas/MealType"
+          },
+          "menuItemId": {
+            "type": "integer"
+          }
         }
       },
       "WeeklySelectionSubmitRequest": {
         "type": "object",
-        "required": ["week_start_date", "selections"],
+        "required": [
+          "week_start_date",
+          "selections"
+        ],
         "properties": {
-          "week_start_date": { "type": "string", "format": "date" },
+          "week_start_date": {
+            "type": "string",
+            "format": "date"
+          },
           "selections": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/WeeklySelectionItem" }
+            "items": {
+              "$ref": "#/components/schemas/WeeklySelectionItem"
+            }
           }
         }
       },
       "WeeklySelectionSubmitResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" }
+          "message": {
+            "type": "string"
+          }
         }
       },
       "WeeklySelectionPreviewRequest": {
         "type": "object",
-        "required": ["selections"],
+        "required": [
+          "selections"
+        ],
         "properties": {
           "selections": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/WeeklySelectionItem" }
+            "items": {
+              "$ref": "#/components/schemas/WeeklySelectionItem"
+            }
           }
         }
       },
       "WeeklySelectionPreviewResponse": {
         "type": "object",
         "properties": {
-          "total_extra_cost": { "type": "string" },
+          "total_extra_cost": {
+            "type": "string"
+          },
           "charged_items": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "name": { "type": "string" },
-                "price": { "type": "number", "format": "float" },
-                "date": { "type": "string", "format": "date" }
+                "name": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                }
               }
             }
           }
         }
       },
-
       "GenerateMealQRResponse": {
         "type": "object",
         "properties": {
-          "qr_code_url": { "type": "string" }
+          "qr_code_url": {
+            "type": "string"
+          }
         }
       },
-
       "GuestOrderRequest": {
         "type": "object",
-        "required": ["menuItemId", "meal_date", "meal_type"],
+        "required": [
+          "menuItemId",
+          "meal_date",
+          "meal_type"
+        ],
         "properties": {
-          "menuItemId": { "type": "integer" },
-          "meal_date": { "type": "string", "format": "date" },
-          "meal_type": { "$ref": "#/components/schemas/MealType" }
+          "menuItemId": {
+            "type": "integer"
+          },
+          "meal_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "meal_type": {
+            "$ref": "#/components/schemas/MealType"
+          }
         }
       },
       "GuestOrderResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "qr_code_url": { "type": "string" },
-          "new_balance": { "type": "number", "format": "float" },
-          "estimated_prep_time": { "type": "integer" }
+          "message": {
+            "type": "string"
+          },
+          "qr_code_url": {
+            "type": "string"
+          },
+          "new_balance": {
+            "type": "number",
+            "format": "float"
+          },
+          "estimated_prep_time": {
+            "type": "integer"
+          }
         }
       },
-
       "ScanQRRequest": {
         "type": "object",
-        "required": ["qr_data"],
+        "required": [
+          "qr_data"
+        ],
         "properties": {
-          "qr_data": { "type": "string", "description": "Stringified JSON from QR" }
+          "qr_data": {
+            "type": "string",
+            "description": "Stringified JSON from QR"
+          }
         }
       },
       "ScanQRResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "mealDetails": { "type": "object" }
+          "message": {
+            "type": "string"
+          },
+          "mealDetails": {
+            "type": "object"
+          }
         }
       },
-
       "RechargeGuestWalletRequest": {
         "type": "object",
-        "required": ["guestId", "amount"],
+        "required": [
+          "guestId",
+          "amount"
+        ],
         "properties": {
-          "guestId": { "type": "integer" },
-          "amount": { "type": "number", "format": "float" }
+          "guestId": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "number",
+            "format": "float"
+          }
         }
       },
       "RechargeGuestWalletResponse": {
         "type": "object",
         "properties": {
-          "message": { "type": "string" },
-          "guestId": { "type": "integer" },
-          "new_balance": { "type": "number", "format": "float" }
+          "message": {
+            "type": "string"
+          },
+          "guestId": {
+            "type": "integer"
+          },
+          "new_balance": {
+            "type": "number",
+            "format": "float"
+          }
         }
       },
-
       "DashboardStatsResponse": {
         "type": "object",
         "properties": {
-          "breakfast_count": { "type": "integer" },
-          "lunch_count": { "type": "integer" },
-          "dinner_count": { "type": "integer" },
-          "total_guest_revenue": { "type": "number", "format": "float" }
+          "breakfast_count": {
+            "type": "integer"
+          },
+          "lunch_count": {
+            "type": "integer"
+          },
+          "dinner_count": {
+            "type": "integer"
+          },
+          "total_guest_revenue": {
+            "type": "number",
+            "format": "float"
+          }
         }
       },
-
       "UsersResponse": {
         "type": "object",
         "properties": {
@@ -356,11 +610,21 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "integer" },
-                "name": { "type": "string" },
-                "email": { "type": "string" },
-                "room_no": { "type": "string" },
-                "role": { "type": "string" }
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "room_no": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -369,10 +633,19 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "integer" },
-                "name": { "type": "string" },
-                "mobile_number": { "type": "string" },
-                "wallet_balance": { "type": "number", "format": "float" }
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mobile_number": {
+                  "type": "string"
+                },
+                "wallet_balance": {
+                  "type": "number",
+                  "format": "float"
+                }
               }
             }
           }
@@ -381,247 +654,835 @@
     }
   },
   "security": [
-    { "bearerAuth": [] }
+    {
+      "bearerAuth": []
+    }
   ],
   "paths": {
     "/": {
       "get": {
         "summary": "Health check",
-        "tags": ["Misc"],
+        "tags": [
+          "Misc"
+        ],
         "security": [],
         "responses": {
-          "200": { "description": "Service healthy (text)" }
+          "200": {
+            "description": "Service healthy (text)"
+          }
         }
       }
     },
-
     "/api/auth/register": {
       "post": {
         "summary": "Register a new user (student/admin/super_admin)",
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "security": [],
-      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } } },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": { "description": "User registered", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterResponse" } } } },
-          "409": { "description": "Email already registered", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "201": {
+            "description": "User registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/auth/login": {
       "post": {
         "summary": "Login (student/admin/super_admin)",
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "security": [],
-      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } } },
-          "401": { "description": "Invalid credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/auth/guest/signup": {
       "post": {
         "summary": "Guest signup (request OTP - mock)",
-        "tags": ["Auth - Guest"],
+        "tags": [
+          "Auth - Guest"
+        ],
         "security": [],
-      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GuestSignupRequest" } } } },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuestSignupRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "OTP sent (mock)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GuestSignupResponse" } } } }
+          "200": {
+            "description": "OTP sent (mock)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestSignupResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/auth/guest/verify": {
       "post": {
         "summary": "Guest login (verify OTP - mock 123456)",
-        "tags": ["Auth - Guest"],
+        "tags": [
+          "Auth - Guest"
+        ],
         "security": [],
-      "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GuestVerifyRequest" } } } },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuestVerifyRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GuestVerifyResponse" } } } },
-          "400": { "description": "Invalid OTP", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "Guest not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestVerifyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid OTP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Guest not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
-
     "/api/student/profile": {
       "get": {
         "summary": "Get student profile",
-        "tags": ["Student"],
+        "tags": [
+          "Student"
+        ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
-          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/student/weekly-menu": {
       "get": {
         "summary": "Get weekly menu (grouped by day & meal)",
-        "tags": ["Student"],
+        "tags": [
+          "Student"
+        ],
         "parameters": [
-          { "in": "query", "name": "week_start_date", "required": true, "schema": { "type": "string", "format": "date" } }
+          {
+            "in": "query",
+            "name": "week_start_date",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StudentWeeklyMenuResponse" } } } },
-          "404": { "description": "No menu for given week", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentWeeklyMenuResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No menu for given week",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/student/weekly-selection/preview": {
       "post": {
         "summary": "Preview costs for a weekly selection",
-        "tags": ["Student"],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WeeklySelectionPreviewRequest" } } } },
+        "tags": [
+          "Student"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklySelectionPreviewRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WeeklySelectionPreviewResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySelectionPreviewResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/student/weekly-selection": {
       "post": {
         "summary": "Submit weekly selection",
-        "tags": ["Student"],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WeeklySelectionSubmitRequest" } } } },
+        "tags": [
+          "Student"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklySelectionSubmitRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": { "description": "Saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WeeklySelectionSubmitResponse" } } } }
+          "201": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySelectionSubmitResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/student/meal-qr": {
       "get": {
         "summary": "Generate QR for a specific meal",
-        "tags": ["Student"],
+        "tags": [
+          "Student"
+        ],
         "parameters": [
-          { "in": "query", "name": "meal_date", "required": true, "schema": { "type": "string", "format": "date" } },
-          { "in": "query", "name": "meal_type", "required": true, "schema": { "$ref": "#/components/schemas/MealType" } }
+          {
+            "in": "query",
+            "name": "meal_date",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "meal_type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MealType"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenerateMealQRResponse" } } } },
-          "404": { "description": "No selection for that meal/date", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateMealQRResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No selection for that meal/date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/student/usage-stats": {
       "get": {
         "summary": "Get monthly usage stats (by menu item)",
-        "tags": ["Student"],
+        "tags": [
+          "Student"
+        ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": { "type": "object", "properties": { "name": { "type": "string" }, "count": { "type": "integer" } } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "count": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
-
     "/api/admin/weekly-menu": {
       "post": {
         "summary": "Set weekly menu (Super Admin only)",
-        "tags": ["Admin"],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetWeeklyMenuRequest" } } } },
+        "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWeeklyMenuRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetWeeklyMenuResponse" } } } },
-          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetWeeklyMenuResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/admin/dashboard": {
       "get": {
         "summary": "Get dashboard stats for today",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin"
+        ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardStatsResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/admin/menu-items": {
       "post": {
         "summary": "Add a menu item (Thali)",
-        "tags": ["Admin"],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MenuItemCreateRequest" } } } },
+        "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MenuItemCreateRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MenuItemCreateResponse" } } } }
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemCreateResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/admin/scan-qr": {
       "post": {
         "summary": "Scan and validate a meal QR",
-        "tags": ["Admin"],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ScanQRRequest" } } } },
+        "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanQRRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ScanQRResponse" } } } },
-          "409": { "description": "Already redeemed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanQRResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already redeemed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/admin/guest/recharge": {
       "post": {
         "summary": "Recharge a guest wallet",
-        "tags": ["Admin"],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RechargeGuestWalletRequest" } } } },
+        "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechargeGuestWalletRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RechargeGuestWalletResponse" } } } },
-          "404": { "description": "Guest not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RechargeGuestWalletResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Guest not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/admin/users": {
       "get": {
         "summary": "List students and guests",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin"
+        ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsersResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsersResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/admin/users/{userId}": {
       "get": {
         "summary": "Get user by ID (students table)",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin"
+        ],
         "parameters": [
-          { "in": "path", "name": "userId", "required": true, "schema": { "type": "integer" } }
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
-          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       },
       "delete": {
         "summary": "Delete user by ID (students table)",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin"
+        ],
         "parameters": [
-          { "in": "path", "name": "userId", "required": true, "schema": { "type": "integer" } }
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Deleted", "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" } } } } } },
-          "409": { "description": "FK constraint error (has history)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "FK constraint error (has history)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
-
+    "/api/student/weekly-selections": {
+      "get": {
+        "summary": "Get all weekly selections for the current week",
+        "tags": [
+          "Student"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "week_start": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "week_end": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "selections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "meal_date": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "meal_type": {
+                            "$ref": "#/components/schemas/MealType"
+                          },
+                          "menuItem": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "image_url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "extra_price": {
+                                "type": "number",
+                                "format": "float"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/guest/weekly-menu": {
       "get": {
         "summary": "Get weekly menu (guest view - unique Thalis)",
-        "tags": ["Guest"],
+        "tags": [
+          "Guest"
+        ],
         "parameters": [
-          { "in": "query", "name": "week_start_date", "required": true, "schema": { "type": "string", "format": "date" } }
+          {
+            "in": "query",
+            "name": "week_start_date",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GuestWeeklyMenuResponse" } } } },
-          "404": { "description": "No menu for given week", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestWeeklyMenuResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No menu for given week",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/guest/order": {
       "post": {
         "summary": "Place an order (guest, wallet charged)",
-        "tags": ["Guest"],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GuestOrderRequest" } } } },
+        "tags": [
+          "Guest"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuestOrderRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GuestOrderResponse" } } } },
-          "402": { "description": "Insufficient wallet balance", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestOrderResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient wallet balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     }
