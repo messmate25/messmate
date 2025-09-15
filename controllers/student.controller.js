@@ -335,6 +335,6 @@ exports.getWeeklySelections = async (req, res) =>{
     });
   } catch (err) {
     console.error("getWeeklySelections error:", err);
-    return res.status(500).json({ error: "Failed to fetch weekly selections" });
+    return res.status(500).json({ error: "Failed to fetch weekly selections" , err });
   }
 };
