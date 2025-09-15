@@ -154,7 +154,7 @@ exports.getAllUsers = async (req, res) => {
     });
 
     const guests = await Guest.findAll({
-      attributes: ['id', 'name', 'mobile_number', 'wallet_balance']
+      attributes: ['id', 'name', 'mobile_number', 'wallet_balance' , 'role']
     });
 
     const admins = await User.findAll({
