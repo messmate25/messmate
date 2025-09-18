@@ -18,6 +18,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true
+      // ⚠️ Note: currently used as email instead of phone
     },
     wallet_balance: {
       type: DataTypes.DECIMAL(10, 2),
