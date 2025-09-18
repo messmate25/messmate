@@ -201,3 +201,32 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
+
+
+// --- Get All Menu Items ---
+exports.getMenuItems = async (req, res) => {
+  try {
+    const { MenuItem } = getModels(req);
+
+    const items = await MenuItem.findAll({
+      attributes: [
+        'id',
+        'name',
+        'description',
+        'image_url',
+        'estimated_prep_time',
+        'monthly_limit',
+        'extra_price'
+      ],
+      order: [['name', 'ASC']] // Optional: sort alphabetically
+    });
+
+    res.status(200).json({ menu_items: items });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Something went wrong while fetching menu items.',
+      error: error.message
+    });
+  }
+};

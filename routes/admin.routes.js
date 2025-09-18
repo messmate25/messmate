@@ -18,6 +18,7 @@ router.post('/weekly-menu', protectedSuperAdminRoute, adminController.setWeeklyM
 // --- Admin & Super Admin Routes ---
 router.get('/dashboard', protectedAdminRoute, adminController.getDashboardStats);
 router.post('/menu-items', protectedAdminRoute, adminController.addMenuItem);
+router.get('/menu-items', protectedAdminRoute, adminController.getMenuItems);
 router.post('/scan-qr', protectedAdminRoute, adminController.scanMealQR);
 router.post('/guest/recharge', protectedAdminRoute, adminController.rechargeGuestWallet);
 router.get('/users', protectedAdminRoute, adminController.getAllUsers);
