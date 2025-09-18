@@ -11,6 +11,7 @@
   "type": "commonjs",
   "dependencies": {
     "@azure/identity": "^4.11.1",
+    "@emailjs/nodejs": "^5.0.2",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",

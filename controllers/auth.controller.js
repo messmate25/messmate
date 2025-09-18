@@ -77,13 +77,13 @@ exports.guestSignup = async (req, res) => {
     const { Guest } = getModels(req);
 
     if (!name || !email) {
-      return res.status(400).json({ message: 'Name and email are required.' });
+      return res.status(400).json({ message: "Name and email are required." });
     }
 
     // Find or create guest
     const [guest, created] = await Guest.findOrCreate({
       where: { mobile_number: email }, // store email in mobile_number column
-      defaults: { name }
+      defaults: { name },
     });
 
     if (!created && guest.name !== name) {
@@ -102,23 +102,28 @@ exports.guestSignup = async (req, res) => {
     // Send OTP via EmailJS
     try {
       await emailjs.send(
-        process.env.EMAILJS_SERVICE_ID,
-        process.env.EMAILJS_TEMPLATE_ID,
-        { to_email: email, otp },
-        { publicKey: process.env.EMAILJS_PUBLIC_KEY, privateKey: process.env.EMAILJS_PRIVATE_KEY }
+        process.env.EMAILJS_SERVICE_ID,  // e.g. service_10dsaqh
+        process.env.EMAILJS_TEMPLATE_ID, // e.g. template_x6o2ibg
+        {
+          to_email: email,
+          otp,
+        },
+        process.env.EMAILJS_PUBLIC_KEY
       );
+      console.log(`OTP email sent successfully to ${email}`);
     } catch (emailError) {
       console.error("EmailJS send error:", emailError.message);
-      // fallback: return OTP in response for dev/testing
+      // fallback: still respond but warn
     }
 
     res.status(200).json({
       message: `OTP sent successfully to ${email}`,
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined // only return OTP in dev
+      otp: process.env.NODE_ENV === "development" ? otp : undefined, // only return OTP in dev
     });
-
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Something went wrong.", error: error.message });
   }
 };
 
@@ -129,16 +134,24 @@ exports.guestVerifyOTP = async (req, res) => {
     const { Guest } = getModels(req);
 
     if (!email || !otp) {
-      return res.status(400).json({ message: 'Email and OTP are required.' });
+      return res
+        .status(400)
+        .json({ message: "Email and OTP are required." });
     }
 
     const guest = await Guest.findOne({ where: { mobile_number: email } });
     if (!guest) {
-      return res.status(404).json({ message: 'Guest not found. Please sign up first.' });
+      return res
+        .status(404)
+        .json({ message: "Guest not found. Please sign up first." });
     }
 
-    if (guest.otp !== otp || !guest.otp_expires_at || new Date() > guest.otp_expires_at) {
-      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    if (
+      guest.otp !== otp ||
+      !guest.otp_expires_at ||
+      new Date() > guest.otp_expires_at
+    ) {
+      return res.status(400).json({ message: "Invalid or expired OTP." });
     }
 
     // OTP valid -> clear it
@@ -147,18 +160,19 @@ exports.guestVerifyOTP = async (req, res) => {
     await guest.save();
 
     const token = jwt.sign(
-      { id: guest.id, name: guest.name, email: guest.mobile_number, role: 'guest' },
+      { id: guest.id, name: guest.name, email: guest.mobile_number, role: "guest" },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: "1h" }
     );
 
     res.status(200).json({
-      message: 'Guest logged in successfully!',
-      result: { id: guest.id, role: 'guest' },
-      token
+      message: "Guest logged in successfully!",
+      result: { id: guest.id, role: "guest" },
+      token,
     });
-
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Something went wrong.", error: error.message });
   }
 };
