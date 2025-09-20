@@ -107,20 +107,21 @@ exports.guestSignup = async (req, res) => {
         process.env.EMAILJS_SERVICE_ID,  // e.g. service_10dsaqh
         process.env.EMAILJS_TEMPLATE_ID, // e.g. template_x6o2ibg
         {
-          to_email: email,
           otp,
+          to_email: email,
         },
         process.env.EMAILJS_PUBLIC_KEY
       );
       console.log(`OTP email sent successfully to ${email}`);
     } catch (emailError) {
+      res.status(500).json({ message: "Failed to send OTP email.", error: emailError.message });
       console.error("EmailJS send error:", emailError.message);
       // fallback: still respond but warn
     }
 
     res.status(200).json({
       message: `OTP sent successfully to ${email}`,
-      otp: process.env.NODE_ENV === "development" ? otp : undefined, // only return OTP in dev
+      otp:  otp,
     });
   } catch (error) {
     res
