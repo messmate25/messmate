@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 // const emailjs = require('@emailjs/nodejs');
 const emailjs = require("emailjs-com");
+const nodemailer = require("nodemailer");
 
 
 /**
@@ -71,6 +72,7 @@ exports.login = async (req, res) => {
   }
 };
 
+
 // --- Guest Signup (Request OTP) ---
 exports.guestSignup = async (req, res) => {
   try {
@@ -100,45 +102,40 @@ exports.guestSignup = async (req, res) => {
     guest.otp_expires_at = otpExpiry;
     await guest.save();
 
+    // --- Nodemailer setup ---
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST, // e.g., "smtp.gmail.com"
+      port: process.env.SMTP_PORT || 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER, // your email
+        pass: process.env.SMTP_PASS, // your email password or app password
+      },
+    });
+
+    const mailOptions = {
+      from: `"MessApp" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Your OTP for MessApp Signup",
+      text: `Hello ${name},\n\nYour OTP is: ${otp}\nIt is valid for 5 minutes.\n\nThanks,\nMessApp Team`,
+      html: `<p>Hello ${name},</p><p>Your OTP is: <b>${otp}</b></p><p>It is valid for 5 minutes.</p><p>Thanks,<br/>MessApp Team</p>`,
+    };
+
     try {
-      const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          service_id: process.env.EMAILJS_SERVICE_ID,
-          template_id: process.env.EMAILJS_TEMPLATE_ID,
-          user_id: process.env.EMAILJS_PUBLIC_KEY,
-          template_params: {
-            to_email: email,
-            otp,
-          },
-        }),
-      });
-      console.error("EmailJS response:", response);
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("EmailJS API Error:", errorBody);
-        return res.status(500).json({
-          message: "Failed to send OTP email.",
-          error: errorBody,
-        });
-      }
-
+      await transporter.sendMail(mailOptions);
       console.log(`OTP email sent successfully to ${email}`);
       return res.status(200).json({
         message: `OTP sent successfully to ${email}`,
-        otp:  otp, // only send OTP in dev mode
+        otp, // only send OTP in dev mode
       });
-    } catch (emailError) {
-      console.error("EmailJS send error:", emailError);
+    } catch (mailError) {
+      console.error("Nodemailer send error:", mailError);
       return res.status(500).json({
         message: "Failed to send OTP email.",
-        error: emailError,
+        error: mailError.message,
       });
     }
+
   } catch (error) {
     return res.status(500).json({
       message: "Something went wrong.",
