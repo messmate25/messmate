@@ -7,6 +7,13 @@ const { Op, fn, col } = require('sequelize');
  */
 const getModels = (req) => req.app.locals.models;
 
+const { BlobServiceClient } = require("@azure/storage-blob");
+
+const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
+const CONTAINER_NAME = "image";
+
+const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
+const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
 
 // --- Super Admin Function ---
 exports.setWeeklyMenu = async (req, res) => {
@@ -76,16 +83,43 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
-// --- Menu Management (Adding Thalis) ---
+// --- Add Menu Item with Image Upload ---
 exports.addMenuItem = async (req, res) => {
   try {
     const { MenuItem } = getModels(req);
-    const { name, estimated_prep_time, monthly_limit, extra_price } = req.body;
+    const { name, estimated_prep_time, monthly_limit, extra_price, description } = req.body;
 
-    const newItem = await MenuItem.create({ name, estimated_prep_time, monthly_limit, extra_price });
-    res.status(201).json({ message: 'Thali added successfully!', item: newItem });
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required." });
+    }
+
+    // Upload to Azure
+    const blobName = `${Date.now()}_${req.file.originalname}`;
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+    await blockBlobClient.uploadData(req.file.buffer, {
+      blobHTTPHeaders: { blobContentType: req.file.mimetype },
+    });
+
+    const imageUrl = blockBlobClient.url;
+
+    // Save to DB
+    const newItem = await MenuItem.create({
+      name,
+      estimated_prep_time,
+      monthly_limit,
+      extra_price,
+      description,
+      image_url: imageUrl,
+    });
+
+    res.status(201).json({
+      message: "Thali added successfully!",
+      item: newItem,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    console.error("Azure Upload Error:", error);
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
 
