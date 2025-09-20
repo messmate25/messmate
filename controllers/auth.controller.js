@@ -5,7 +5,6 @@ const jwt = require('jsonwebtoken');
 // const emailjs = require('@emailjs/nodejs');
 const emailjs = require("emailjs-com");
 
-require('dotenv').config();
 
 /**
  * Helper to get initialized models from request
