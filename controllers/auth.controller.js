@@ -116,6 +116,7 @@ exports.guestSignup = async (req, res) => {
           },
         }),
       });
+      console.error("EmailJS response:", response);
 
       if (!response.ok) {
         const errorBody = await response.text();
@@ -132,10 +133,10 @@ exports.guestSignup = async (req, res) => {
         otp:  otp, // only send OTP in dev mode
       });
     } catch (emailError) {
-      console.error("EmailJS send error:", emailError.message);
+      console.error("EmailJS send error:", emailError);
       return res.status(500).json({
         message: "Failed to send OTP email.",
-        error: emailError.message,
+        error: emailError,
       });
     }
   } catch (error) {
