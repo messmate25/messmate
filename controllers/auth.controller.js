@@ -101,34 +101,51 @@ exports.guestSignup = async (req, res) => {
     guest.otp_expires_at = otpExpiry;
     await guest.save();
 
-    // Send OTP via EmailJS
+    // Send OTP via EmailJS REST API
     try {
-      await emailjs.send(
-        process.env.EMAILJS_SERVICE_ID,  // e.g. service_10dsaqh
-        process.env.EMAILJS_TEMPLATE_ID, // e.g. template_x6o2ibg
-        {
-          otp,
-          to_email: email,
-        },
-        process.env.EMAILJS_PUBLIC_KEY
-      );
-      console.log(`OTP email sent successfully to ${email}`);
-    } catch (emailError) {
-      res.status(500).json({ message: "Failed to send OTP email.", error: emailError.message });
-      console.error("EmailJS send error:", emailError.message);
-      // fallback: still respond but warn
-    }
+      const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: process.env.EMAILJS_SERVICE_ID,
+          template_id: process.env.EMAILJS_TEMPLATE_ID,
+          user_id: process.env.EMAILJS_PUBLIC_KEY,
+          template_params: {
+            to_email: email,
+            otp,
+          },
+        }),
+      });
 
-    res.status(200).json({
-      message: `OTP sent successfully to ${email}`,
-      otp:  otp,
-    });
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("EmailJS API Error:", errorBody);
+        return res.status(500).json({
+          message: "Failed to send OTP email.",
+          error: errorBody,
+        });
+      }
+
+      console.log(`OTP email sent successfully to ${email}`);
+      return res.status(200).json({
+        message: `OTP sent successfully to ${email}`,
+        otp:  otp, // only send OTP in dev mode
+      });
+    } catch (emailError) {
+      console.error("EmailJS send error:", emailError.message);
+      return res.status(500).json({
+        message: "Failed to send OTP email.",
+        error: emailError.message,
+      });
+    }
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Something went wrong.", error: error.message });
+    return res.status(500).json({
+      message: "Something went wrong.",
+      error: error.message,
+    });
   }
 };
+
 
 // --- Guest Login (Verify OTP) ---
 exports.guestVerifyOTP = async (req, res) => {
