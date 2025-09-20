@@ -3,7 +3,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 // const emailjs = require('@emailjs/nodejs');
-import emailjs from "emailjs-com";
+const emailjs = require("emailjs-com");
+
 require('dotenv').config();
 
 /**
