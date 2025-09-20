@@ -106,7 +106,7 @@ exports.guestSignup = async (req, res) => {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": 'Bearer ${process.env.EMAILJS_PRIVATE_KEY}'
+          "Authorization": `Bearer ${process.env.EMAILJS_PRIVATE_KEY}`
         },
         body: JSON.stringify({
           service_id: process.env.EMAILJS_SERVICE_ID,
