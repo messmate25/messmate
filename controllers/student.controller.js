@@ -70,7 +70,7 @@ exports.getWeeklyMenu = async (req, res) => {
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
-    const { WeeklySelection, MealHistory, MenuItem, User } = getModels(req);
+    const { WeeklySelection, MealHistory, MenuItem, User , Transaction } = getModels(req);
     const userId = req.user.id;
     const { selections, week_start_date } = req.body;
 
@@ -131,7 +131,7 @@ exports.submitWeeklySelection = async (req, res) => {
       await user.save();
 
       // ✅ Log in MealHistory
-      await MealHistory.create({
+      await Transaction.create({
         userId,
         transaction_type: 'debit',
         amount: totalExtraCharge,
