@@ -43,6 +43,45 @@ exports.setWeeklyMenu = async (req, res) => {
   }
 };
 
+
+
+// Fetch weekly menus
+exports.getWeeklyMenus = async (req, res) => {
+  try {
+    const { week_number, start_date } = req.query; // optional query params
+    const { WeeklyMenu } = getModels(req);
+
+    if (week_number && !start_date) {
+      return res.status(400).json({ message: 'Please provide start_date when using week_number.' });
+    }
+
+    let menus;
+
+    if (week_number && start_date) {
+      // Calculate the date for the requested week
+      const startDateObj = new Date(start_date);
+      const targetDate = new Date(startDateObj);
+      targetDate.setDate(startDateObj.getDate() + (7 * (parseInt(week_number) - 1)));
+
+      const targetWeek = targetDate.toISOString().split('T')[0]; // format YYYY-MM-DD
+
+      menus = await WeeklyMenu.findAll({
+        where: { week_start_date: targetWeek },
+        order: [['day_of_week', 'ASC'], ['meal_type', 'ASC']]
+      });
+    } else {
+      // Fetch all weeks if no week_number
+      menus = await WeeklyMenu.findAll({
+        order: [['week_start_date', 'ASC'], ['day_of_week', 'ASC'], ['meal_type', 'ASC']]
+      });
+    }
+
+    res.status(200).json({ menus });
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};
+
 // --- Dashboard ---
 exports.getDashboardStats = async (req, res) => {
   try {

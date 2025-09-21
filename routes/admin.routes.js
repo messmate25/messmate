@@ -29,7 +29,7 @@ router.post(
   upload.single("image"), // Expecting field "image" in form-data
   adminController.addMenuItem
 );
-
+router.get("/weekly-menus", protectedAdminRoute, adminController.getWeeklyMenus);
 router.post("/weekly-menu", protectedAdminRoute, adminController.setWeeklyMenu);
 router.get("/menu-items", protectedAdminRoute, adminController.getMenuItems);
 router.post("/scan-qr", protectedAdminRoute, adminController.scanMealQR);
