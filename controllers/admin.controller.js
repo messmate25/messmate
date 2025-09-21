@@ -335,3 +335,63 @@ exports.getMenuItems = async (req, res) => {
     });
   }
 };
+
+exports.updateMenuItem = async (req, res) => {
+  try {
+    const { MenuItem } = getModels(req);
+    const { id } = req.params;
+    const { name, description, estimated_prep_time, monthly_limit, extra_price } = req.body;
+
+    const item = await MenuItem.findByPk(id);
+    if (!item) {
+      return res.status(404).json({ message: 'Menu item not found.' });
+    }
+
+    // Handle image upload if provided
+    let imageUrl = item.image_url;
+    if (req.file) {
+      const blobName = `${Date.now()}_${req.file.originalname}`;
+      const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+      await blockBlobClient.uploadData(req.file.buffer, {
+        blobHTTPHeaders: { blobContentType: req.file.mimetype },
+      });
+
+      imageUrl = blockBlobClient.url;
+    }
+
+    await item.update({
+      name,
+      description,
+      estimated_prep_time,
+      monthly_limit,
+      extra_price,
+      image_url: imageUrl
+    });
+
+    res.status(200).json({ message: 'Menu item updated successfully!', item });
+  } catch (error) {
+    console.error("Update Error:", error);
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};
+
+// --- Delete a menu item ---
+exports.deleteMenuItem = async (req, res) => {
+  try {
+    const { MenuItem } = getModels(req);
+    const { id } = req.params;
+
+    const item = await MenuItem.findByPk(id);
+    if (!item) {
+      return res.status(404).json({ message: 'Menu item not found.' });
+    }
+
+    await item.destroy();
+
+    res.status(200).json({ message: 'Menu item deleted successfully!' });
+  } catch (error) {
+    console.error("Delete Error:", error);
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};

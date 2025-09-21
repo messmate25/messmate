@@ -23,16 +23,31 @@ const protectedSuperAdminRoute = [authMiddleware, superAdminMiddleware];
 router.get("/dashboard", protectedAdminRoute, adminController.getDashboardStats);
 
 // ⬇️ Updated: Added multer middleware to handle image upload
-router.post(
-  "/menu-items",
-  protectedAdminRoute,
-  upload.single("image"), // Expecting field "image" in form-data
-  adminController.addMenuItem
-);
+
 router.get("/weekly-menus", protectedAdminRoute, adminController.getWeeklyMenus);
 router.post("/weekly-menu", protectedAdminRoute, adminController.setWeeklyMenu);
 router.delete("/weekly-menu/:week_start_date", protectedAdminRoute, adminController.deleteWeeklyMenu);
 
+
+router.post(
+    "/menu-items",
+    protectedAdminRoute,
+    upload.single("image"), // Expecting field "image" in form-data
+    adminController.addMenuItem
+);
+router.put(
+  "/menu-items/:id",
+  protectedAdminRoute,
+  upload.single("image"), // Optional new image
+  adminController.updateMenuItem
+);
+
+// --- Delete menu item ---
+router.delete(
+  "/menu-items/:id",
+  protectedAdminRoute,
+  adminController.deleteMenuItem
+);
 router.get("/menu-items", protectedAdminRoute, adminController.getMenuItems);
 router.post("/scan-qr", protectedAdminRoute, adminController.scanMealQR);
 router.post("/guest/recharge", protectedAdminRoute, adminController.rechargeGuestWallet);
