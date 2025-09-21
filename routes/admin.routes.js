@@ -18,7 +18,6 @@ const protectedAdminRoute = [authMiddleware, adminMiddleware];
 const protectedSuperAdminRoute = [authMiddleware, superAdminMiddleware];
 
 // --- Super Admin Routes ---
-router.post("/weekly-menu", protectedSuperAdminRoute, adminController.setWeeklyMenu);
 
 // --- Admin & Super Admin Routes ---
 router.get("/dashboard", protectedAdminRoute, adminController.getDashboardStats);
@@ -31,6 +30,7 @@ router.post(
   adminController.addMenuItem
 );
 
+router.post("/weekly-menu", protectedAdminRoute, adminController.setWeeklyMenu);
 router.get("/menu-items", protectedAdminRoute, adminController.getMenuItems);
 router.post("/scan-qr", protectedAdminRoute, adminController.scanMealQR);
 router.post("/guest/recharge", protectedAdminRoute, adminController.rechargeGuestWallet);
