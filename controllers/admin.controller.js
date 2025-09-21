@@ -16,6 +16,7 @@ const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_C
 const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
 
 // --- Super Admin Function ---
+// Set weekly menu
 exports.setWeeklyMenu = async (req, res) => {
   try {
     const { week_start_date, menu } = req.body; // menu is an array of objects
@@ -43,13 +44,11 @@ exports.setWeeklyMenu = async (req, res) => {
   }
 };
 
-
-
-// Fetch weekly menus
+// Fetch weekly menus with menu item names
 exports.getWeeklyMenus = async (req, res) => {
   try {
     const { week_number, start_date } = req.query; // optional query params
-    const { WeeklyMenu } = getModels(req);
+    const { WeeklyMenu, MenuItem } = getModels(req);
 
     if (week_number && !start_date) {
       return res.status(400).json({ message: 'Please provide start_date when using week_number.' });
@@ -58,25 +57,58 @@ exports.getWeeklyMenus = async (req, res) => {
     let menus;
 
     if (week_number && start_date) {
-      // Calculate the date for the requested week
       const startDateObj = new Date(start_date);
       const targetDate = new Date(startDateObj);
       targetDate.setDate(startDateObj.getDate() + (7 * (parseInt(week_number) - 1)));
-
       const targetWeek = targetDate.toISOString().split('T')[0]; // format YYYY-MM-DD
 
       menus = await WeeklyMenu.findAll({
         where: { week_start_date: targetWeek },
+        include: [{ model: MenuItem, attributes: ['name', 'description', 'image_url'] }],
         order: [['day_of_week', 'ASC'], ['meal_type', 'ASC']]
       });
     } else {
-      // Fetch all weeks if no week_number
       menus = await WeeklyMenu.findAll({
+        include: [{ model: MenuItem, attributes: ['name', 'description', 'image_url'] }],
         order: [['week_start_date', 'ASC'], ['day_of_week', 'ASC'], ['meal_type', 'ASC']]
       });
     }
 
-    res.status(200).json({ menus });
+    // Map to include menu item name directly
+    const response = menus.map(m => ({
+      id: m.id,
+      week_start_date: m.week_start_date,
+      day_of_week: m.day_of_week,
+      meal_type: m.meal_type,
+      menuItemId: m.menuItemId,
+      name: m.MenuItem?.name || '',
+      description: m.MenuItem?.description || '',
+      imageUrl: m.MenuItem?.image_url || ''
+    }));
+
+    res.status(200).json({ menus: response });
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};
+
+// Delete weekly menu
+exports.deleteWeeklyMenu = async (req, res) => {
+  try {
+    const { week_start_date } = req.params;
+    const { WeeklyMenu } = getModels(req);
+
+    if (!week_start_date) {
+      return res.status(400).json({ message: 'Week start date is required.' });
+    }
+
+    const deleted = await WeeklyMenu.destroy({ where: { week_start_date } });
+
+    if (deleted) {
+      res.status(200).json({ message: `Weekly menu for ${week_start_date} has been deleted.` });
+    } else {
+      res.status(404).json({ message: `No weekly menu found for ${week_start_date}.` });
+    }
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }

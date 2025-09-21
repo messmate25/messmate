@@ -31,6 +31,8 @@ router.post(
 );
 router.get("/weekly-menus", protectedAdminRoute, adminController.getWeeklyMenus);
 router.post("/weekly-menu", protectedAdminRoute, adminController.setWeeklyMenu);
+router.delete("/weekly-menu/:week_start_date", protectedAdminRoute, adminController.deleteWeeklyMenu);
+
 router.get("/menu-items", protectedAdminRoute, adminController.getMenuItems);
 router.post("/scan-qr", protectedAdminRoute, adminController.scanMealQR);
 router.post("/guest/recharge", protectedAdminRoute, adminController.rechargeGuestWallet);
