@@ -301,7 +301,7 @@ exports.previewWeeklySelection = async (req, res) => {
 exports.getWeeklySelections = async (req, res) => {
   try {
     // Await models
-    const { WeeklySelection, MenuItem } = await getModels();
+    const { WeeklySelection, MenuItem } = await getModels(req);
 
     const userId = req.user.id;
 
