@@ -50,7 +50,17 @@ module.exports = (sequelize) => {
 
   }, {
     tableName: 'meal_history',
-    timestamps: true,   // ✅ track createdAt, updatedAt
+    timestamps: true, 
+    createdAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW
+    },
+    updatedAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW
+    }  // ✅ track createdAt, updatedAt
   });
 
   return MealHistory;

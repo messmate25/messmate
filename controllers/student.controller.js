@@ -144,9 +144,10 @@ exports.submitWeeklySelection = async (req, res) => {
 };
 
 // --- Generate QR Code for a specific meal ---
+// --- Generate QR Code for a specific meal ---
 exports.generateMealQR = async (req, res) => {
   try {
-    const { WeeklySelection, MenuItem, MealHistory } = getModels(req);
+    const { sequelize, WeeklySelection, MenuItem } = getModels(req); // Make sure sequelize is available
     const userId = req.user.id;
     const { meal_date, meal_type } = req.query;
 
@@ -163,7 +164,7 @@ exports.generateMealQR = async (req, res) => {
       return res.status(404).json({ message: `You have not made a selection for ${meal_type} on ${meal_date}.` });
     }
 
-
+    // ✅ Generate QR Payload
     const qrPayload = {
       userId,
       userName: req.user.name,
@@ -176,22 +177,37 @@ exports.generateMealQR = async (req, res) => {
         image_url: selection.MenuItem.image_url
       }]
     };
-    await MealHistory.create({
-      meal_date: meal_date,
-      meal_type,
-      qr_code_data: JSON.stringify(qrPayload),
-      is_valid: true,
-      guestId: userId,
+
+    // ✅ Use Raw SQL to insert into meal_history
+    const query = `
+      INSERT INTO meal_history 
+        (meal_date, meal_type, qr_code_data, is_valid, guestId, createdAt, updatedAt)
+      VALUES 
+        (:meal_date, :meal_type, :qr_code_data, :is_valid, :guestId, GETDATE(), GETDATE());
+    `;
+
+    await sequelize.query(query, {
+      replacements: {
+        meal_date,  // already in YYYY-MM-DD format
+        meal_type,
+        qr_code_data: JSON.stringify(qrPayload),
+        is_valid: true,
+        guestId: userId
+      },
+      type: sequelize.QueryTypes.INSERT
     });
 
-    res.status(200).json({ qr_code_url: JSON.stringify(qrPayload) });
-
+    return res.status(200).json({
+      qr_code_url: JSON.stringify(qrPayload),
+      message: "Meal history saved with raw SQL"
+    });
 
   } catch (error) {
     console.error('generateMealQR error:', error);
-    res.status(500).json({ message: 'Something went wrong.', error: error });
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
 
 // --- Get Monthly Usage Statistics ---
 exports.getUsageStats = async (req, res) => {
