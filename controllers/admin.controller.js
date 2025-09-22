@@ -232,6 +232,7 @@ exports.scanMealQR = async (req, res) => {
   try {
     const { MealHistory } = getModels(req);
     const { qr_data } = req.body;
+
     if (!qr_data) return res.status(400).json({ message: 'QR data is required.' });
 
     let mealDetails;
@@ -242,33 +243,48 @@ exports.scanMealQR = async (req, res) => {
     }
 
     const { userId, guestId, meal_date, meal_type } = mealDetails;
-    const whereClause = { meal_date, meal_type };
 
-    if (userId) whereClause.userId = userId;
-    else if (guestId) whereClause.guestId = guestId;
-    else return res.status(400).json({ message: 'Invalid QR code: No user or guest ID found.' });
+    if (!meal_date || !meal_type || (!userId && !guestId)) {
+      return res.status(400).json({ message: 'QR code missing required fields.' });
+    }
 
-    const existingEntry = await MealHistory.findOne({ where: whereClause });
-    if (existingEntry) return res.status(409).json({ message: 'This meal has already been redeemed today.' });
+    // Validate meal_date
+    const mealDateObj = new Date(meal_date);
+    if (isNaN(mealDateObj)) {
+      return res.status(400).json({ message: 'Invalid meal_date in QR code.' });
+    }
 
-    await MealHistory.create({
-      userId,
-      guestId,
-      meal_date: new Date(meal_date), // ✅
+    // Check if meal already exists
+    const existingEntry = await MealHistory.findOne({
+      where: {
+        meal_date: meal_date,
+        meal_type,
+        ...(userId ? { userId } : { guestId })
+      }
+    });
+
+    if (existingEntry) {
+      return res.status(409).json({ message: 'This meal has already been redeemed today.' });
+    }
+
+    // Create new meal entry
+    const newMeal = await MealHistory.create({
+      userId: userId || null,
+      guestId: guestId || null,
+      meal_date: meal_date, // Sequelize handles DATEONLY
       meal_type,
       qr_code_data: qr_data,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }, { fields: ['userId', 'guestId', 'meal_date', 'meal_type', 'qr_code_data', 'createdAt', 'updatedAt'] });
+      scanned_at: new Date()   // current timestamp
+    });
 
+    return res.status(200).json({ message: 'Meal verified successfully!', meal: newMeal });
 
-
-    res.status(200).json({ message: 'Meal verified successfully!', mealDetails });
   } catch (error) {
     console.error("QR Scan Error:", error);
-    res.status(500).json({ message: 'Something went wrong.', error: error });
+    return res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
 
 // --- User Management ---
 exports.getAllUsers = async (req, res) => {
