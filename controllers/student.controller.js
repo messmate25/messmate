@@ -163,10 +163,6 @@ exports.generateMealQR = async (req, res) => {
       return res.status(404).json({ message: `You have not made a selection for ${meal_type} on ${meal_date}.` });
     }
 
-    function formatDateForMSSQL(date) {
-      return date.toISOString().slice(0, 23).replace("T", " ");
-      // Gives "2025-09-22 22:41:45.474"
-    }
 
     const qrPayload = {
       userId,
@@ -181,13 +177,11 @@ exports.generateMealQR = async (req, res) => {
       }]
     };
     await MealHistory.create({
-      meal_date: new Date(meal_date),
+      meal_date: meal_date,
       meal_type,
       qr_code_data: JSON.stringify(qrPayload),
       is_valid: true,
       guestId: userId,
-      createdAt: formatDateForMSSQL(new Date()),
-      updatedAt: formatDateForMSSQL(new Date())
     });
 
     res.status(200).json({ qr_code_url: JSON.stringify(qrPayload) });
