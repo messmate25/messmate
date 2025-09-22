@@ -254,10 +254,14 @@ exports.scanMealQR = async (req, res) => {
     await MealHistory.create({
       userId,
       guestId,
-      meal_date,
+      meal_date: new Date(meal_date), // ✅
       meal_type,
       qr_code_data: qr_data,
-    }, { fields: ['userId', 'guestId', 'meal_date', 'meal_type', 'qr_code_data'] });
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }, { fields: ['userId', 'guestId', 'meal_date', 'meal_type', 'qr_code_data', 'createdAt', 'updatedAt'] });
+
+
 
     res.status(200).json({ message: 'Meal verified successfully!', mealDetails });
   } catch (error) {
