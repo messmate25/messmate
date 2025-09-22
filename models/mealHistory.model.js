@@ -38,7 +38,16 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true   // ✅ helps invalidate expired/used QR
-    }
+    },
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    weekly_selection_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+
   }, {
     tableName: 'meal_history',
     timestamps: true,   // ✅ track createdAt, updatedAt
