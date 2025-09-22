@@ -46,12 +46,7 @@ module.exports = (sequelize) => {
     weekly_selection_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
-    },
-
-  }, {
-    tableName: 'meal_history',
-    timestamps: true, 
-    createdAt: {
+    }, createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW
@@ -60,7 +55,12 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW
-    }  // ✅ track createdAt, updatedAt
+    }
+
+  }, {
+    tableName: 'meal_history',
+    timestamps: true,
+    // ✅ track createdAt, updatedAt
   });
 
   return MealHistory;
