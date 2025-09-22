@@ -200,7 +200,8 @@ exports.rechargeStudentWallet = async (req, res) => {
     const { User, Transaction } = getModels(req); // using User instead of Guest
     const { userId, amount } = req.body;
 
-    if (!userId || !amount) {s
+    if (!userId || !amount) {
+      s
       return res.status(400).json({ message: 'User ID and amount are required.' });
     }
 
@@ -212,7 +213,7 @@ exports.rechargeStudentWallet = async (req, res) => {
     await user.save();
 
     // (Optional but recommended) log in transactions table
-   
+
 
     res.status(200).json({
       message: 'Wallet recharged successfully!',
@@ -250,7 +251,13 @@ exports.scanMealQR = async (req, res) => {
     const existingEntry = await MealHistory.findOne({ where: whereClause });
     if (existingEntry) return res.status(409).json({ message: 'This meal has already been redeemed today.' });
 
-    await MealHistory.create({ userId, guestId, meal_date, meal_type, qr_code_data: qr_data });
+    await MealHistory.create({
+      userId,
+      guestId,
+      meal_date,
+      meal_type,
+      qr_code_data: qr_data,
+    }, { fields: ['userId', 'guestId', 'meal_date', 'meal_type', 'qr_code_data'] });
 
     res.status(200).json({ message: 'Meal verified successfully!', mealDetails });
   } catch (error) {
@@ -270,7 +277,7 @@ exports.getAllUsers = async (req, res) => {
     });
 
     const guests = await Guest.findAll({
-      attributes: ['id', 'name', 'mobile_number', 'wallet_balance' , 'role']
+      attributes: ['id', 'name', 'mobile_number', 'wallet_balance', 'role']
     });
 
     const admins = await User.findAll({
