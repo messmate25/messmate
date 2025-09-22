@@ -297,30 +297,44 @@ exports.previewWeeklySelection = async (req, res) => {
 };
 
 // GET /student/weekly-selections
-exports.getWeeklySelections = async (req, res) =>{
+
+exports.getWeeklySelections = async (req, res) => {
   try {
+    // Await models
+    const { WeeklySelection, MenuItem } = await getModels();
+
     const userId = req.user.id;
 
     // Get start of week (Monday) and end of week (Sunday)
     const today = new Date();
     const day = today.getDay(); // 0 = Sunday
     const diffToMonday = day === 0 ? -6 : 1 - day;
+
     const monday = new Date(today);
     monday.setDate(today.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
 
-    const selections = await req.models.WeeklySelection.findAll({
+    const selections = await WeeklySelection.findAll({
       where: {
         userId,
         meal_date: {
-          [req.models.sequelize.Op.between]: [monday, sunday],
+          [Op.between]: [monday, sunday],
         },
       },
       include: [
-        { model: req.models.MenuItem, attributes: ["id", "name", "image_url", "extra_price"] }
+        {
+          model: MenuItem,
+          attributes: ["id", "name", "image_url", "extra_price"],
+        },
       ],
-      order: [["meal_date", "ASC"], ["meal_type", "ASC"]],
+      order: [
+        ["meal_date", "ASC"],
+        ["meal_type", "ASC"],
+      ],
     });
 
     return res.json({
@@ -330,6 +344,6 @@ exports.getWeeklySelections = async (req, res) =>{
     });
   } catch (err) {
     console.error("getWeeklySelections error:", err);
-    return res.status(500).json({ error: "Failed to fetch weekly selections" , err });
+    return res.status(500).json({ error: "Failed to fetch weekly selections", details: err.message });
   }
 };
