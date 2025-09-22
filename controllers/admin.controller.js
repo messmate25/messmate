@@ -226,7 +226,7 @@ exports.rechargeStudentWallet = async (req, res) => {
     });
   } catch (error) {
     console.error("Recharge error:", error);
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    res.status(500).json({ message: 'Something went very wrong', error: error.message });
   }
 };
 
