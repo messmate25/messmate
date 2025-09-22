@@ -259,9 +259,8 @@ exports.scanMealQR = async (req, res) => {
       where: {
         meal_date,
         meal_type,
-        qr_code_data: qr_data,
         is_valid: true,
-        ...(userId ? { userId } : { guestId })
+        guestId: userId   // check guestId matches the current user
       }
     });
 

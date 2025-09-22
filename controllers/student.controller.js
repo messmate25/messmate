@@ -177,18 +177,19 @@ exports.generateMealQR = async (req, res) => {
     };
     let mealDATE = new Date(meal_date);
     await MealHistory.create({
-      userId,
       meal_date: mealDATE,
       meal_type,
       qr_code_data: JSON.stringify(qrPayload),
       is_valid: true,
       guestId: userId,
     });
+
     res.status(200).json({ qr_code_url: JSON.stringify(qrPayload) });
 
 
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    console.error('generateMealQR error:', error);
+    res.status(500).json({ message: 'Something went wrong.', error: error });
   }
 };
 
