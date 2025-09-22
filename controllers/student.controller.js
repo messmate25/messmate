@@ -131,12 +131,7 @@ exports.submitWeeklySelection = async (req, res) => {
       await user.save();
 
       // ✅ Log in MealHistory
-      await Transaction.create({
-        userId,
-        transaction_type: 'debit',
-        amount: totalExtraCharge,
-        remarks: 'Weekly selection extra charges'
-      });
+      
     }
 
     res.status(201).json({

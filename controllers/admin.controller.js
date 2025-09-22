@@ -212,12 +212,7 @@ exports.rechargeStudentWallet = async (req, res) => {
     await user.save();
 
     // (Optional but recommended) log in transactions table
-    await Transaction.create({
-      userId: user.id,
-      type: 'credit',
-      amount: amount,
-      description: 'Wallet recharge by admin'
-    });
+   
 
     res.status(200).json({
       message: 'Wallet recharged successfully!',
