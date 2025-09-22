@@ -129,15 +129,12 @@ exports.getDashboardStats = async (req, res) => {
       group: ['meal_type']
     });
 
-    const guestRevenue = await MealHistory.sum('total_cost', {
-      where: { guestId: { [Op.ne]: null }, scanned_at: { [Op.between]: [today, tomorrow] } }
-    });
+    
 
     const stats = {
       breakfast_count: 0,
       lunch_count: 0,
       dinner_count: 0,
-      total_guest_revenue: guestRevenue || 0
     };
 
     mealCounts.forEach(mc => {

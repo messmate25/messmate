@@ -2,7 +2,7 @@
 const { DataTypes } = require('sequelize');
 
 // models/mealHistory.model.js
-module.exports = (sequelize, DataTypes) => {
+module.exports = (sequelize) => {
   const MealHistory = sequelize.define("MealHistory", {
     id: {
       type: DataTypes.INTEGER,
