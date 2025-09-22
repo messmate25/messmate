@@ -1,67 +1,48 @@
 // File: models/mealHistory.model.js
 const { DataTypes } = require('sequelize');
 
-module.exports = (sequelize) => {
-  const MealHistory = sequelize.define('MealHistory', {
+// models/mealHistory.model.js
+module.exports = (sequelize, DataTypes) => {
+  const MealHistory = sequelize.define("MealHistory", {
     id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
-      allowNull: false
     },
-    guestId: {
+    userId: {
       type: DataTypes.INTEGER,
-      allowNull: true,   // ✅ can be null if userId is set
+      allowNull: false,
     },
     meal_date: {
       type: DataTypes.DATEONLY,
-      allowNull: false
+      allowNull: false,
     },
     meal_type: {
-      type: DataTypes.ENUM('breakfast', 'lunch', 'dinner'),
-      allowNull: false
-    },
-    total_cost: {
-      type: DataTypes.DECIMAL(10, 2),
+      type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 0.00
+    },
+    menu_item_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     qr_code_data: {
       type: DataTypes.TEXT,
-      allowNull: false
-    },
-    scanned_at: {
-      type: DataTypes.DATE,
-      allowNull: true   // ✅ null until admin scans
+      allowNull: false,
     },
     is_valid: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
-      defaultValue: true   // ✅ helps invalidate expired/used QR
+      defaultValue: true,
     },
-    userId: {
-      type: DataTypes.INTEGER,
+    scanned_at: {
+      type: DataTypes.DATE,
       allowNull: true,
     },
-    weekly_selection_id: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    }, createdAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW
-    },
-    updatedAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW
-    }
-
   }, {
-    tableName: 'meal_history',
-    timestamps: true,
-    // ✅ track createdAt, updatedAt
+    tableName: "meal_history",
+    timestamps: false, // Auto-adds createdAt and updatedAt
   });
 
   return MealHistory;
 };
+

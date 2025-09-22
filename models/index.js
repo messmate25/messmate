@@ -33,13 +33,10 @@ async function initModels() {
 
   // User/Guest <-> MealHistory
   User.hasMany(MealHistory, { foreignKey: "userId" });
-  MealHistory.belongsTo(User, { foreignKey: "userId" });
   Guest.hasMany(MealHistory, { foreignKey: "guestId" });
-  MealHistory.belongsTo(Guest, { foreignKey: "guestId" });
 
   // WeeklySelection <-> MealHistory (link scanned QR back to selection)
   WeeklySelection.hasMany(MealHistory, { foreignKey: "weekly_selection_id" });
-  MealHistory.belongsTo(WeeklySelection, { foreignKey: "weekly_selection_id" });
 
   // User <-> Transaction
   User.hasMany(Transaction, { foreignKey: "userId" });

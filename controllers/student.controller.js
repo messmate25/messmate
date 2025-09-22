@@ -144,67 +144,63 @@ exports.submitWeeklySelection = async (req, res) => {
 };
 
 // --- Generate QR Code for a specific meal ---
-// --- Generate QR Code for a specific meal ---
 exports.generateMealQR = async (req, res) => {
   try {
-    const { sequelize, WeeklySelection, MenuItem } = getModels(req); // Make sure sequelize is available
+    const { WeeklySelection, MenuItem, MealHistory } = getModels(req);
     const userId = req.user.id;
     const { meal_date, meal_type } = req.query;
 
     if (!meal_date || !meal_type) {
-      return res.status(400).json({ message: 'Please provide both meal_date and meal_type.' });
+      return res.status(400).json({ message: "Please provide both meal_date and meal_type." });
     }
 
+    // Find the user's weekly selection for that meal & date
     const selection = await WeeklySelection.findOne({
       where: { userId, meal_date, meal_type },
-      include: [{ model: MenuItem, attributes: ['id', 'name', 'description', 'image_url'] }]
+      include: [{ model: MenuItem, attributes: ["id", "name", "description", "image_url"] }],
     });
 
     if (!selection) {
-      return res.status(404).json({ message: `You have not made a selection for ${meal_type} on ${meal_date}.` });
+      return res.status(404).json({
+        message: `You have not made a selection for ${meal_type} on ${meal_date}.`,
+      });
     }
 
-    // ✅ Generate QR Payload
+    // Prepare QR payload
     const qrPayload = {
       userId,
       userName: req.user.name,
       meal_date,
       meal_type,
-      items: [{
-        id: selection.MenuItem.id,
-        name: selection.MenuItem.name,
-        description: selection.MenuItem.description,
-        image_url: selection.MenuItem.image_url
-      }]
+      items: [
+        {
+          id: selection.MenuItem.id,
+          name: selection.MenuItem.name,
+          description: selection.MenuItem.description,
+          image_url: selection.MenuItem.image_url,
+        },
+      ],
     };
 
-    // ✅ Use Raw SQL to insert into meal_history
-    const query = `
-      INSERT INTO meal_history 
-        (meal_date, meal_type, qr_code_data, is_valid, guestId, createdAt, updatedAt)
-      VALUES 
-        (:meal_date, :meal_type, :qr_code_data, :is_valid, :guestId, GETDATE(), GETDATE());
-    `;
-
-    await sequelize.query(query, {
-      replacements: {
-        meal_date,  // already in YYYY-MM-DD format
-        meal_type,
-        qr_code_data: JSON.stringify(qrPayload),
-        is_valid: true,
-        guestId: userId
-      },
-      type: sequelize.QueryTypes.INSERT
+    // Save in meal_history table
+    const mealHistory = await MealHistory.create({
+      userId,
+      meal_date,
+      meal_type,
+      menu_item_id: selection.MenuItem.id,
+      qr_code_data: JSON.stringify(qrPayload),
+      is_valid: true,
     });
 
+    // Return QR payload + database reference
     return res.status(200).json({
-      qr_code_url: JSON.stringify(qrPayload),
-      message: "Meal history saved with raw SQL"
+      message: "QR generated successfully.",
+      qr_code_payload: qrPayload,
+      meal_history_id: mealHistory.id, // helps track this QR later
     });
-
   } catch (error) {
-    console.error('generateMealQR error:', error);
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    console.error("generateMealQR error:", error);
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
 
