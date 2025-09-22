@@ -9,6 +9,10 @@ module.exports = (sequelize) => {
       primaryKey: true,
       allowNull: false
     },
+    guestId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,   // ✅ can be null if userId is set
+    },
     meal_date: {
       type: DataTypes.DATEONLY,
       allowNull: false
@@ -34,16 +38,7 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true   // ✅ helps invalidate expired/used QR
-    },
-    createdAt: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
-    },
-    updatedAt: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
     }
-
   }, {
     tableName: 'meal_history',
     timestamps: true,   // ✅ track createdAt, updatedAt
