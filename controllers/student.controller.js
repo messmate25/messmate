@@ -70,7 +70,7 @@ exports.getWeeklyMenu = async (req, res) => {
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
-    const { WeeklySelection, MealHistory, MenuItem, User , Transaction } = getModels(req);
+    const { WeeklySelection, MealHistory, MenuItem, User, Transaction } = getModels(req);
     const userId = req.user.id;
     const { selections, week_start_date } = req.body;
 
@@ -121,8 +121,8 @@ exports.submitWeeklySelection = async (req, res) => {
       }
 
       if (parseFloat(user.wallet_balance) < totalExtraCharge) {
-        return res.status(400).json({ 
-          message: 'Insufficient wallet balance. Please recharge your wallet.' 
+        return res.status(400).json({
+          message: 'Insufficient wallet balance. Please recharge your wallet.'
         });
       }
 
@@ -131,7 +131,7 @@ exports.submitWeeklySelection = async (req, res) => {
       await user.save();
 
       // ✅ Log in MealHistory
-      
+
     }
 
     res.status(201).json({
@@ -176,9 +176,8 @@ exports.generateMealQR = async (req, res) => {
       }]
     };
 
-    const qrCodeDataURL = await qrcode.toDataURL(JSON.stringify(qrPayload));
+    res.status(200).json({ qr_code_url: JSON.stringify(qrPayload) });
 
-    res.status(200).json({ qr_code_url: qrCodeDataURL });
 
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });

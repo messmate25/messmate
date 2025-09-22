@@ -1,6 +1,5 @@
 // File: controllers/admin.controller.js
-const Jimp = require('jimp');
-const QrCode = require('qrcode-reader');
+
 const { Op, fn, col } = require('sequelize');
 
 /**
@@ -228,131 +227,36 @@ exports.rechargeStudentWallet = async (req, res) => {
 
 
 // --- QR Code Scanning ---
-
-
 exports.scanMealQR = async (req, res) => {
   try {
     const { MealHistory } = getModels(req);
     const { qr_data } = req.body;
-    
-    if (!qr_data) {
-      return res.status(400).json({ message: 'QR data is required.' });
-    }
+    if (!qr_data) return res.status(400).json({ message: 'QR data is required.' });
 
     let mealDetails;
-    
-    // Check if it's a base64 image data URL
-    if (qr_data.startsWith('data:image/png;base64,')) {
-      try {
-        // Extract base64 data from data URL
-        const base64Data = qr_data.replace(/^data:image\/png;base64,/, '');
-        
-        // Decode QR code from image
-        mealDetails = await decodeQRFromBase64(base64Data);
-      } catch (decodeError) {
-        return res.status(400).json({ 
-          message: 'Failed to decode QR code image.', 
-          error: decodeError.message 
-        });
-      }
-    } else {
-      // Assume it's already JSON string
-      try {
-        mealDetails = JSON.parse(qr_data);
-      } catch (parseError) {
-        return res.status(400).json({ 
-          message: 'Invalid QR code format.', 
-          error: parseError.message 
-        });
-      }
+    try {
+      mealDetails = JSON.parse(qr_data);
+    } catch {
+      return res.status(400).json({ message: 'Invalid QR code format.' });
     }
 
-    // Continue with your existing logic
     const { userId, guestId, meal_date, meal_type } = mealDetails;
     const whereClause = { meal_date, meal_type };
 
     if (userId) whereClause.userId = userId;
     else if (guestId) whereClause.guestId = guestId;
-    else {
-      return res.status(400).json({ 
-        message: 'Invalid QR code: No user or guest ID found.' 
-      });
-    }
+    else return res.status(400).json({ message: 'Invalid QR code: No user or guest ID found.' });
 
     const existingEntry = await MealHistory.findOne({ where: whereClause });
-    if (existingEntry) {
-      return res.status(409).json({ 
-        message: 'This meal has already been redeemed today.' 
-      });
-    }
+    if (existingEntry) return res.status(409).json({ message: 'This meal has already been redeemed today.' });
 
-    await MealHistory.create({ 
-      userId, 
-      guestId, 
-      meal_date, 
-      meal_type, 
-      qr_code_data: JSON.stringify(mealDetails) 
-    });
+    await MealHistory.create({ userId, guestId, meal_date, meal_type, qr_code_data: qr_data });
 
-    res.status(200).json({ 
-      message: 'Meal verified successfully!', 
-      mealDetails 
-    });
-
+    res.status(200).json({ message: 'Meal verified successfully!', mealDetails });
   } catch (error) {
-    console.error('Scan QR Error:', error);
-    res.status(500).json({ 
-      message: 'Something went wrong.', 
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
-
-// Helper function to decode QR code from base64 image
-async function decodeQRFromBase64(base64Data) {
-  return new Promise((resolve, reject) => {
-    try {
-      // Convert base64 to buffer
-      const buffer = Buffer.from(base64Data, 'base64');
-      
-      // Read image with Jimp
-      Jimp.read(buffer, (err, image) => {
-        if (err) {
-          reject(new Error('Failed to read QR image: ' + err.message));
-          return;
-        }
-
-        // Create QR code reader
-        const qr = new QrCode();
-        
-        qr.callback = function(err, value) {
-          if (err) {
-            reject(new Error('QR code decoding failed: ' + err.message));
-            return;
-          }
-          
-          if (!value || !value.result) {
-            reject(new Error('No QR code found in image'));
-            return;
-          }
-
-          try {
-            // Parse the QR code content as JSON
-            const parsedData = JSON.parse(value.result);
-            resolve(parsedData);
-          } catch (parseErr) {
-            reject(new Error('QR content is not valid JSON: ' + parseErr.message));
-          }
-        };
-        
-        // Decode the QR code
-        qr.decode(image.bitmap);
-      });
-    } catch (error) {
-      reject(error);
-    }
-  });
-}
 
 // --- User Management ---
 exports.getAllUsers = async (req, res) => {
