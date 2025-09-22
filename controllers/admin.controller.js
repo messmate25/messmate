@@ -254,36 +254,34 @@ exports.scanMealQR = async (req, res) => {
       return res.status(400).json({ message: 'Invalid meal_date in QR code.' });
     }
 
-    // Check if meal already exists
+    // Check if QR exists and is valid
     const existingEntry = await MealHistory.findOne({
       where: {
-        meal_date: meal_date,
+        meal_date,
         meal_type,
+        qr_code_data: qr_data,
+        is_valid: true,
         ...(userId ? { userId } : { guestId })
       }
     });
 
-    if (existingEntry) {
-      return res.status(409).json({ message: 'This meal has already been redeemed today.' });
+    if (!existingEntry) {
+      return res.status(400).json({ message: 'This QR code is invalid or has already been used.' });
     }
 
-    // Create new meal entry
-    const newMeal = await MealHistory.create({
-      userId: userId || null,
-      guestId: guestId || null,
-      meal_date: meal_date, // Sequelize handles DATEONLY
-      meal_type,
-      qr_code_data: qr_data,
-      scanned_at: new Date()   // current timestamp
-    });
+    // Mark QR as used
+    existingEntry.is_valid = false;
+    existingEntry.scanned_at = new Date();
+    await existingEntry.save();
 
-    return res.status(200).json({ message: 'Meal verified successfully!', meal: newMeal });
+    return res.status(200).json({ message: 'Meal verified successfully!', meal: existingEntry });
 
   } catch (error) {
     console.error("QR Scan Error:", error);
     return res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
 
 
 // --- User Management ---

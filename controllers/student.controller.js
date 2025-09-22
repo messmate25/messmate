@@ -146,7 +146,7 @@ exports.submitWeeklySelection = async (req, res) => {
 // --- Generate QR Code for a specific meal ---
 exports.generateMealQR = async (req, res) => {
   try {
-    const { WeeklySelection, MenuItem } = getModels(req);
+    const { WeeklySelection, MenuItem  , MealHistory} = getModels(req);
     const userId = req.user.id;
     const { meal_date, meal_type } = req.query;
 
@@ -175,7 +175,15 @@ exports.generateMealQR = async (req, res) => {
         image_url: selection.MenuItem.image_url
       }]
     };
-
+    let mealDATE = new Date(meal_date);
+    await MealHistory.create({
+      userId,
+      meal_date: mealDATE,
+      meal_type,
+      qr_code_data: JSON.stringify(qrPayload),
+      is_valid: true,
+      guestId: userId,
+    });
     res.status(200).json({ qr_code_url: JSON.stringify(qrPayload) });
 
 

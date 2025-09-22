@@ -1,3 +1,4 @@
+// File: models/mealHistory.model.js
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
@@ -9,7 +10,7 @@ module.exports = (sequelize) => {
       allowNull: false
     },
     meal_date: {
-      type: DataTypes.DATEONLY,  // YYYY-MM-DD
+      type: DataTypes.DATEONLY,
       allowNull: false
     },
     meal_type: {
@@ -27,20 +28,25 @@ module.exports = (sequelize) => {
     },
     scanned_at: {
       type: DataTypes.DATE,
-      allowNull: true
+      allowNull: true   // ✅ null until admin scans
     },
     is_valid: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
-      defaultValue: true
+      defaultValue: true   // ✅ helps invalidate expired/used QR
     },
-    guestId: {
-      type: DataTypes.INTEGER,
-      allowNull: true
+    createdAt: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
+    },
+    updatedAt: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
     }
+
   }, {
     tableName: 'meal_history',
-    timestamps: true, // Sequelize will manage createdAt & updatedAt
+    timestamps: true,   // ✅ track createdAt, updatedAt
   });
 
   return MealHistory;
