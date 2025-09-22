@@ -254,7 +254,8 @@ exports.scanMealQR = async (req, res) => {
 
     res.status(200).json({ message: 'Meal verified successfully!', mealDetails });
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    console.error("QR Scan Error:", error);
+    res.status(500).json({ message: 'Something went wrong.', error: error });
   }
 };
 
