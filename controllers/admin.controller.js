@@ -200,7 +200,7 @@ exports.rechargeStudentWallet = async (req, res) => {
     const { User, Transaction } = getModels(req); // using User instead of Guest
     const { userId, amount } = req.body;
 
-    if (!userId || !amount) {
+    if (!userId || !amount) {s
       return res.status(400).json({ message: 'User ID and amount are required.' });
     }
 
