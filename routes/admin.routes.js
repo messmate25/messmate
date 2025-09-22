@@ -50,7 +50,7 @@ router.delete(
 );
 router.get("/menu-items", protectedAdminRoute, adminController.getMenuItems);
 router.post("/scan-qr", protectedAdminRoute, adminController.scanMealQR);
-router.post("/guest/recharge", protectedAdminRoute, adminController.rechargeGuestWallet);
+router.post("/students/recharge", protectedAdminRoute, adminController.rechargeStudentWallet);
 router.get("/users", protectedAdminRoute, adminController.getAllUsers);
 router.get("/users/:userId", protectedAdminRoute, adminController.getUserById);
 router.delete("/users/:userId", protectedAdminRoute, adminController.deleteUser);

@@ -194,27 +194,42 @@ exports.addMenuItem = async (req, res) => {
   }
 };
 
-// --- Guest Wallet Management ---
-exports.rechargeGuestWallet = async (req, res) => {
+// --- Student Wallet Management ---
+exports.rechargeStudentWallet = async (req, res) => {
   try {
-    const { Guest } = getModels(req);
-    const { guestId, amount } = req.body;
+    const { User, Transaction } = getModels(req); // using User instead of Guest
+    const { userId, amount } = req.body;
 
-    if (!guestId || !amount) {
-      return res.status(400).json({ message: 'Guest ID and amount are required.' });
+    if (!userId || !amount) {
+      return res.status(400).json({ message: 'User ID and amount are required.' });
     }
 
-    const guest = await Guest.findByPk(guestId);
-    if (!guest) return res.status(404).json({ message: 'Guest not found.' });
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
 
-    guest.wallet_balance = parseFloat(guest.wallet_balance) + parseFloat(amount);
-    await guest.save();
+    // Update balance
+    user.wallet_balance = parseFloat(user.wallet_balance || 0) + parseFloat(amount);
+    await user.save();
 
-    res.status(200).json({ message: 'Wallet recharged successfully!', guestId: guest.id, new_balance: guest.wallet_balance });
+    // (Optional but recommended) log in transactions table
+    await Transaction.create({
+      userId: user.id,
+      type: 'credit',
+      amount: amount,
+      description: 'Wallet recharge by admin'
+    });
+
+    res.status(200).json({
+      message: 'Wallet recharged successfully!',
+      userId: user.id,
+      new_balance: user.wallet_balance
+    });
   } catch (error) {
+    console.error("Recharge error:", error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
 
 // --- QR Code Scanning ---
 exports.scanMealQR = async (req, res) => {
