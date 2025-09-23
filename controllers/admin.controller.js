@@ -330,7 +330,34 @@ exports.scanMealQR = async (req, res) => {
 
 
 
+exports.updateWalletBalance = async (req, res) => {
+  try {
+    const { User } = getModels(req);
+    const { userId, wallet_balance } = req.body;
 
+    if (!userId || wallet_balance === undefined) {
+      return res.status(400).json({ message: "Please provide userId and wallet_balance." });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    user.wallet_balance = parseFloat(wallet_balance);
+    await user.save();
+
+    return res.status(200).json({
+      message: "Wallet balance updated successfully.",
+      userId: user.id,
+      wallet_balance: user.wallet_balance
+    });
+  } catch (error) {
+    console.error("updateWalletBalance error:", error);
+    return res.status(500).json({ message: "Something went wrong.", error: error.message });
+  }
+};
 
 // --- User Management ---
 exports.getAllUsers = async (req, res) => {

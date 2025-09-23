@@ -54,5 +54,6 @@ router.post("/students/recharge", protectedAdminRoute, adminController.rechargeS
 router.get("/users", protectedAdminRoute, adminController.getAllUsers);
 router.get("/users/:userId", protectedAdminRoute, adminController.getUserById);
 router.delete("/users/:userId", protectedAdminRoute, adminController.deleteUser);
+router.post('/recharge', protectedAdminRoute, adminController.updateWalletBalance);
 
 module.exports = router;
