@@ -235,14 +235,17 @@ exports.scanMealQR = async (req, res) => {
 
     let mealDetails;
     try {
-      mealDetails = JSON.parse(qr_data);
+      const parsedData = JSON.parse(qr_data);
+
+      // Support both formats: nested qr_code_payload or top-level
+      mealDetails = parsedData.qr_code_payload ? parsedData.qr_code_payload : parsedData;
     } catch {
       return res.status(400).json({ message: "Invalid QR code format." });
     }
 
     const { userId, meal_date, meal_type } = mealDetails;
 
-    if (!meal_date || !meal_type || !userId ) {
+    if (!meal_date || !meal_type || !userId) {
       return res.status(400).json({ message: "QR code missing required fields." });
     }
 
@@ -252,16 +255,15 @@ exports.scanMealQR = async (req, res) => {
       return res.status(400).json({ message: "Invalid meal_date in QR code." });
     }
 
-    // Build dynamic query depending on whether userId or guestId exists
-    const whereClause = {
-      meal_date,
-      meal_type,
-      is_valid: true
-    };
-    if (userId) whereClause.userId = userId;
-
     // Check if QR exists and is valid
-    const existingEntry = await MealHistory.findOne({ where: whereClause });
+    const existingEntry = await MealHistory.findOne({
+      where: {
+        meal_date,
+        meal_type,
+        is_valid: true,
+        userId
+      }
+    });
 
     if (!existingEntry) {
       return res.status(400).json({ message: "This QR code is invalid or has already been used." });
@@ -282,6 +284,7 @@ exports.scanMealQR = async (req, res) => {
     return res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
+
 
 
 
