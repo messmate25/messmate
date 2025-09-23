@@ -154,6 +154,19 @@ exports.generateMealQR = async (req, res) => {
       return res.status(400).json({ message: "Please provide both meal_date and meal_type." });
     }
 
+    // Check if QR already exists for this user, meal_date, and meal_type
+    const existingQR = await MealHistory.findOne({
+      where: { userId, meal_date, meal_type }
+    });
+
+    if (existingQR) {
+      return res.status(409).json({
+        message: `QR already generated for ${meal_type} on ${meal_date}.`,
+        qr_code_payload: JSON.parse(existingQR.qr_code_data),
+        meal_history_id: existingQR.id
+      });
+    }
+
     // Find the user's weekly selection for that meal & date
     const selection = await WeeklySelection.findOne({
       where: { userId, meal_date, meal_type },
@@ -203,6 +216,7 @@ exports.generateMealQR = async (req, res) => {
     res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
+
 
 
 // --- Get Monthly Usage Statistics ---
