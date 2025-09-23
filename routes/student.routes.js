@@ -31,6 +31,5 @@ router.get('/meal-qr', studentController.generateMealQR);
 // GET /api/student/usage-stats
 router.get('/usage-stats', studentController.getUsageStats);
 
-router.post('/recharge', studentController.updateWalletBalance);
 
 module.exports = router;

@@ -330,6 +330,7 @@ exports.scanMealQR = async (req, res) => {
 
 
 
+// --- Add Amount to Wallet Balance ---
 exports.updateWalletBalance = async (req, res) => {
   try {
     const { User } = getModels(req);
@@ -345,7 +346,8 @@ exports.updateWalletBalance = async (req, res) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    user.wallet_balance = parseFloat(wallet_balance);
+    // Add the amount to existing balance
+    user.wallet_balance = parseFloat(user.wallet_balance || 0) + parseFloat(wallet_balance);
     await user.save();
 
     return res.status(200).json({
@@ -358,6 +360,7 @@ exports.updateWalletBalance = async (req, res) => {
     return res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
+
 
 // --- User Management ---
 exports.getAllUsers = async (req, res) => {
