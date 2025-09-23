@@ -35,7 +35,7 @@ module.exports = (sequelize) => {
       defaultValue: true,
     },
     scanned_at: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
       allowNull: true,
     },
   }, {

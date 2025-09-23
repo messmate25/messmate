@@ -129,7 +129,7 @@ exports.getDashboardStats = async (req, res) => {
       group: ['meal_type']
     });
 
-    
+
 
     const stats = {
       breakfast_count: 0,
@@ -230,7 +230,7 @@ exports.scanMealQR = async (req, res) => {
     const { MealHistory } = getModels(req);
     const { qr_data } = req.body;
 
-    if (!qr_data) 
+    if (!qr_data)
       return res.status(400).json({ message: "QR data is required." });
 
     let mealDetails;
@@ -271,12 +271,14 @@ exports.scanMealQR = async (req, res) => {
 
     // Mark QR as used
     existingEntry.is_valid = false;
-    existingEntry.scanned_at = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // sets time to 00:00:00
+    existingEntry.scanned_at = today;
     await existingEntry.save();
 
-    return res.status(200).json({ 
-      message: "Meal verified successfully!", 
-      meal: existingEntry 
+    return res.status(200).json({
+      message: "Meal verified successfully!",
+      meal: existingEntry
     });
 
   } catch (error) {
