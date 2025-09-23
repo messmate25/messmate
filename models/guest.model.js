@@ -38,6 +38,10 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: 'guests'
     },
+    phone: {
+      type: DataTypes.STRING,
+      allowNull: true
+    }
   }, {
     tableName: 'guests',
     timestamps: true

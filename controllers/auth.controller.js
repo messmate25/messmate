@@ -76,18 +76,19 @@ exports.login = async (req, res) => {
 // --- Guest Signup (Request OTP) ---
 exports.guestSignup = async (req, res) => {
   try {
-    const { name, email } = req.body; // treat as email
+    const { name, email , phone } = req.body; // treat as email
     const { Guest } = getModels(req);
 
-    if (!name || !email) {
+    if (!name || !email || !phone) {
       return res.status(400).json({ message: "Name and email are required." });
     }
 
     // Find or create guest
     const [guest, created] = await Guest.findOrCreate({
-      where: { mobile_number: email }, // store email in mobile_number column
-      defaults: { name },
-    });
+      where: { mobile_number: email },
+      defaults: { name, phone }
+    }
+    );
 
     if (!created && guest.name !== name) {
       guest.name = name;
