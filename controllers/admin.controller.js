@@ -230,39 +230,41 @@ exports.scanMealQR = async (req, res) => {
     const { MealHistory } = getModels(req);
     const { qr_data } = req.body;
 
-    if (!qr_data) return res.status(400).json({ message: 'QR data is required.' });
+    if (!qr_data) 
+      return res.status(400).json({ message: "QR data is required." });
 
     let mealDetails;
     try {
       mealDetails = JSON.parse(qr_data);
     } catch {
-      return res.status(400).json({ message: 'Invalid QR code format.' });
+      return res.status(400).json({ message: "Invalid QR code format." });
     }
 
-    const { userId, guestId, meal_date, meal_type } = mealDetails;
+    const { userId, meal_date, meal_type } = mealDetails;
 
-    if (!meal_date || !meal_type || (!userId && !guestId)) {
-      return res.status(400).json({ message: 'QR code missing required fields.' });
+    if (!meal_date || !meal_type || !userId ) {
+      return res.status(400).json({ message: "QR code missing required fields." });
     }
 
     // Validate meal_date
     const mealDateObj = new Date(meal_date);
     if (isNaN(mealDateObj)) {
-      return res.status(400).json({ message: 'Invalid meal_date in QR code.' });
+      return res.status(400).json({ message: "Invalid meal_date in QR code." });
     }
 
+    // Build dynamic query depending on whether userId or guestId exists
+    const whereClause = {
+      meal_date,
+      meal_type,
+      is_valid: true
+    };
+    if (userId) whereClause.userId = userId;
+
     // Check if QR exists and is valid
-    const existingEntry = await MealHistory.findOne({
-      where: {
-        meal_date,
-        meal_type,
-        is_valid: true,
-        guestId: userId   // check guestId matches the current user
-      }
-    });
+    const existingEntry = await MealHistory.findOne({ where: whereClause });
 
     if (!existingEntry) {
-      return res.status(400).json({ message: 'This QR code is invalid or has already been used.' });
+      return res.status(400).json({ message: "This QR code is invalid or has already been used." });
     }
 
     // Mark QR as used
@@ -270,13 +272,17 @@ exports.scanMealQR = async (req, res) => {
     existingEntry.scanned_at = new Date();
     await existingEntry.save();
 
-    return res.status(200).json({ message: 'Meal verified successfully!', meal: existingEntry });
+    return res.status(200).json({ 
+      message: "Meal verified successfully!", 
+      meal: existingEntry 
+    });
 
   } catch (error) {
     console.error("QR Scan Error:", error);
-    return res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    return res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
+
 
 
 
