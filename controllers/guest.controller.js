@@ -69,18 +69,7 @@ exports.placeOrder = async (req, res) => {
       return res.status(404).json({ message: 'Selected Thali not found.' });
     }
 
-    const totalCost = parseFloat(menuItem.extra_price);
 
-    if (parseFloat(guest.wallet_balance) < totalCost) {
-      return res.status(402).json({
-        message: 'Insufficient wallet balance.',
-        required: totalCost,
-        balance: guest.wallet_balance
-      });
-    }
-
-    guest.wallet_balance = parseFloat(guest.wallet_balance) - totalCost;
-    await guest.save();
 
     const qrPayload = {
       guestId: guest.id,
@@ -91,10 +80,11 @@ exports.placeOrder = async (req, res) => {
     };
 
     await MealHistory.create({
-      guestId: guest.id,
+      userId: guestId,
       meal_date,
       meal_type,
-      total_cost: totalCost,
+      menu_item_id: menuItemId,
+      is_valid: false,
       qr_code_data: JSON.stringify(qrPayload),
       scanned_at: new Date()
     });
@@ -104,8 +94,6 @@ exports.placeOrder = async (req, res) => {
     res.status(200).json({
       message: 'Order placed successfully!',
       qr_code_url: qrCodeDataURL,
-      new_balance: guest.wallet_balance,
-      estimated_prep_time: menuItem.estimated_prep_time
     });
 
   } catch (error) {
