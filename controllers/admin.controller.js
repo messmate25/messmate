@@ -118,20 +118,24 @@ exports.deleteWeeklyMenu = async (req, res) => {
 exports.getDashboardStats = async (req, res) => {
   try {
     const { MealHistory } = getModels(req);
-    const { Op, fn, col } = require("sequelize");
+    const { Op, fn, col, literal } = require("sequelize");
 
-    // === Daily stats ===
+    // --- Daily Stats ---
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
     const dailyCounts = await MealHistory.findAll({
-      where: { meal_date: today },
+      where: {
+        meal_date: {
+          [Op.between]: [today, tomorrow]
+        }
+      },
       attributes: [
         'meal_type',
         [fn('COUNT', col('id')), 'total_orders'],
-        [fn('SUM', fn('CASE', fn('WHEN', col('is_valid'), 1, 0))), 'remaining_valid']
+        [literal('SUM(CASE WHEN is_valid = 1 THEN 1 ELSE 0 END)'), 'remaining_valid']
       ],
       group: ['meal_type']
     });
@@ -153,17 +157,18 @@ exports.getDashboardStats = async (req, res) => {
       }
     });
 
-    // === Weekly stats ===
-    const weekStart = new Date();
-    weekStart.setDate(today.getDate() - 6); // last 7 days
-    weekStart.setHours(0, 0, 0, 0);
+    // --- Weekly Stats (last 7 days including today) ---
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - 6); // 7-day range
 
     const weekCounts = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [weekStart, today] } },
+      where: {
+        meal_date: { [Op.between]: [weekStart, today] }
+      },
       attributes: [
         'meal_type',
         [fn('COUNT', col('id')), 'total_orders'],
-        [fn('SUM', fn('CASE', fn('WHEN', col('is_valid'), 1, 0))), 'remaining_valid']
+        [literal('SUM(CASE WHEN is_valid = 1 THEN 1 ELSE 0 END)'), 'remaining_valid']
       ],
       group: ['meal_type']
     });
