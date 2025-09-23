@@ -118,38 +118,80 @@ exports.deleteWeeklyMenu = async (req, res) => {
 exports.getDashboardStats = async (req, res) => {
   try {
     const { MealHistory } = getModels(req);
+    const { Op, fn, col } = require("sequelize");
+
+    // === Daily stats ===
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    const mealCounts = await MealHistory.findAll({
-      where: { scanned_at: { [Op.between]: [today, tomorrow] } },
-      attributes: ['meal_type', [fn('COUNT', col('id')), 'count']],
+    const dailyCounts = await MealHistory.findAll({
+      where: { meal_date: today },
+      attributes: [
+        'meal_type',
+        [fn('COUNT', col('id')), 'total_orders'],
+        [fn('SUM', fn('CASE', fn('WHEN', col('is_valid'), 1, 0))), 'remaining_valid']
+      ],
       group: ['meal_type']
     });
 
-
-
-    const stats = {
-      breakfast_count: 0,
-      lunch_count: 0,
-      dinner_count: 0,
+    const dailyStats = {
+      breakfast: { total_orders: 0, served: 0, remaining: 0 },
+      lunch: { total_orders: 0, served: 0, remaining: 0 },
+      dinner: { total_orders: 0, served: 0, remaining: 0 },
     };
 
-    mealCounts.forEach(mc => {
+    dailyCounts.forEach(mc => {
       const mealType = mc.getDataValue('meal_type');
-      const count = mc.getDataValue('count');
-      if (mealType === 'breakfast') stats.breakfast_count = count;
-      if (mealType === 'lunch') stats.lunch_count = count;
-      if (mealType === 'dinner') stats.dinner_count = count;
+      const totalOrders = parseInt(mc.getDataValue('total_orders'));
+      const remaining = parseInt(mc.getDataValue('remaining_valid'));
+      const served = totalOrders - remaining;
+
+      if (dailyStats[mealType]) {
+        dailyStats[mealType] = { total_orders: totalOrders, served, remaining };
+      }
     });
 
-    res.status(200).json(stats);
+    // === Weekly stats ===
+    const weekStart = new Date();
+    weekStart.setDate(today.getDate() - 6); // last 7 days
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekCounts = await MealHistory.findAll({
+      where: { meal_date: { [Op.between]: [weekStart, today] } },
+      attributes: [
+        'meal_type',
+        [fn('COUNT', col('id')), 'total_orders'],
+        [fn('SUM', fn('CASE', fn('WHEN', col('is_valid'), 1, 0))), 'remaining_valid']
+      ],
+      group: ['meal_type']
+    });
+
+    const weeklyStats = {
+      breakfast: { total_orders: 0, served: 0, remaining: 0 },
+      lunch: { total_orders: 0, served: 0, remaining: 0 },
+      dinner: { total_orders: 0, served: 0, remaining: 0 },
+    };
+
+    weekCounts.forEach(mc => {
+      const mealType = mc.getDataValue('meal_type');
+      const totalOrders = parseInt(mc.getDataValue('total_orders'));
+      const remaining = parseInt(mc.getDataValue('remaining_valid'));
+      const served = totalOrders - remaining;
+
+      if (weeklyStats[mealType]) {
+        weeklyStats[mealType] = { total_orders: totalOrders, served, remaining };
+      }
+    });
+
+    res.status(200).json({ dailyStats, weeklyStats });
   } catch (error) {
+    console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
 
 // --- Add Menu Item with Image Upload ---
 exports.addMenuItem = async (req, res) => {
