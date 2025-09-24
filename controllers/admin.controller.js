@@ -121,13 +121,44 @@ exports.getDashboardStats = async (req, res) => {
     const { MealHistory } = getModels(req);
     const { Op } = require("sequelize");
 
+    const formatDate = (d) => d.toISOString().split('T')[0];
+
+    // --- Daily stats ---
+    const todayObj = new Date();
+    todayObj.setHours(0, 0, 0, 0);
+    const today = formatDate(todayObj);
+
+    const dailyMeals = await MealHistory.findAll({
+      where: { meal_date: today }
+    });
+
+    // --- Weekly stats (Monday to Sunday) ---
+    const currentDay = todayObj.getDay(); // Sunday=0, Monday=1, ...
+    const daysSinceMonday = (currentDay + 6) % 7; // convert Sunday=0 → Monday=0
+    const mondayObj = new Date(todayObj);
+    mondayObj.setDate(todayObj.getDate() - daysSinceMonday);
+
+    const sundayObj = new Date(mondayObj);
+    sundayObj.setDate(mondayObj.getDate() + 6);
+
+    const mondayStr = formatDate(mondayObj);
+    const sundayStr = formatDate(sundayObj);
+
+    const weeklyMeals = await MealHistory.findAll({
+      where: {
+        meal_date: {
+          [Op.between]: [mondayStr, sundayStr]
+        }
+      }
+    });
+
     // Helper to aggregate item counts
     const aggregateItems = (mealHistories) => {
       const mealStats = {};
 
       mealHistories.forEach(mh => {
-        const isServed = !mh.is_valid ? 1 : 0;
-        const isRemaining = mh.is_valid ? 1 : 0;
+        const isServed = mh.is_valid ? 0 : 1;  // ✅ if scanned (is_valid=false) → served
+        const isRemaining = mh.is_valid ? 1 : 0; // ✅ remaining = not scanned yet
 
         let items = [];
         try {
@@ -155,36 +186,10 @@ exports.getDashboardStats = async (req, res) => {
       return { total_orders, served, remaining, items: mealStats };
     };
 
-    // --- Daily stats ---
-    // Use DATEONLY-compatible comparison
-    const today = new Date().toISOString().split('T')[0]; // e.g., '2025-09-25'
-
-    const dailyMeals = await MealHistory.findAll({
-      where: {
-        meal_date: today
-      }
-    });
-
     const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
     ['breakfast', 'lunch', 'dinner'].forEach(type => {
       const filtered = dailyMeals.filter(m => m.meal_type === type);
       dailyStats[type] = aggregateItems(filtered);
-    });
-
-    // --- Weekly stats (last 7 days including today) ---
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - 6);
-    const weekStartStr = weekStart.toISOString().split('T')[0]; // e.g., '2025-09-19'
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]; // e.g., '2025-09-26'
-
-    const weeklyMeals = await MealHistory.findAll({
-      where: {
-        meal_date: {
-          [Op.between]: [weekStartStr, tomorrowStr]
-        }
-      }
     });
 
     const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
@@ -194,11 +199,13 @@ exports.getDashboardStats = async (req, res) => {
     });
 
     res.status(200).json({ dailyStats, weeklyStats });
+
   } catch (error) {
     console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
 
 
 
