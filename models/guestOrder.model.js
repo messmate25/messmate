@@ -16,7 +16,8 @@ module.exports = (sequelize) => {
       },
       order_date: {
         type: DataTypes.DATEONLY,
-        defaultValue: DataTypes.NOW,
+        allowNull: false,
+
       },
       status: {
         type: DataTypes.ENUM("ordered", "preparing", "prepared", "served"),

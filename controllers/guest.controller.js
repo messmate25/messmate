@@ -81,6 +81,7 @@ exports.placeOrder = async (req, res) => {
     // ✅ Create Guest Order
     const order = await GuestOrder.create({
       guestId,
+      order_date: new Date(),
       status: "ordered",
       estimated_preparation_time: estimatedPrepText, // storing text directly
     });
