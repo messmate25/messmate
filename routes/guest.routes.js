@@ -6,6 +6,7 @@ const router = express.Router();
 // Import controllers and middleware
 const guestController = require('../controllers/guest.controller');
 const authMiddleware = require('../middleware/auth.middleware');
+const adminController = require('../controllers/admin.controller');
 
 // All routes in this file are for logged-in guests.
 router.use(authMiddleware);
@@ -16,6 +17,6 @@ router.get('/weekly-menu', guestController.getWeeklyMenu);
 // POST /api/guest/order
 router.post('/order', guestController.placeOrder);
 router.get('/guestOrders/:id', guestController.getGuestOrdersById);
-router.get('/menu-items', guestController.getMenuItems);
+router.get('/menu-items', adminController.getMenuItems);
 
 module.exports = router;
