@@ -152,7 +152,7 @@ exports.getDashboardStats = async (req, res) => {
       const dayWiseOrders = {};
       
       selections.forEach(selection => {
-        const dateStr = selection.meal_date.toISOString().split('T')[0];
+        const dateStr = selection.meal_date;
         const mealType = selection.meal_type;
         
         if (!dayWiseOrders[dateStr]) {
