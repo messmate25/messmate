@@ -112,7 +112,7 @@ exports.submitWeeklySelection = async (req, res) => {
       return res.status(400).json({ message: 'Please provide selections and the week start date.' });
     }
 
-    // ✅ Validation: only one thali per meal
+    // ✅ Validation: only one thali per meal (within the request)
     const selectionsByDayMeal = {};
     for (const s of selections) {
       const key = `${s.meal_date}-${s.meal_type}`;
@@ -126,7 +126,7 @@ exports.submitWeeklySelection = async (req, res) => {
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
 
-    // ✅ Get existing selections to compare and calculate charges properly
+    // ✅ Get existing selections (for duplicate check)
     const existingSelections = await WeeklySelection.findAll({
       where: { userId, meal_date: { [Op.between]: [startDate, endDate] } },
       include: [{ model: MenuItem }]
@@ -139,62 +139,32 @@ exports.submitWeeklySelection = async (req, res) => {
       existingSelectionMap.set(key, selection);
     });
 
-    // ✅ Prepare operations: create new or update existing
-    const operations = [];
+    // ✅ Prepare only NEW selections (no updates, no deletes)
     const newSelections = [];
-
     for (const selection of selections) {
       const key = `${selection.meal_date}-${selection.meal_type}`;
-      const existingSelection = existingSelectionMap.get(key);
-
-      if (existingSelection) {
-        // ✅ Update existing selection if menuItemId changed
-        if (existingSelection.menuItemId !== selection.menuItemId) {
-          operations.push(
-            WeeklySelection.update(
-              { menuItemId: selection.menuItemId },
-              { where: { id: existingSelection.id } }
-            )
-          );
-        }
-        // Remove from map to track what remains (needs to be deleted)
-        existingSelectionMap.delete(key);
-      } else {
-        // ✅ Create new selection
-        newSelections.push({
-          ...selection,
-          userId,
-          is_default: false
+      if (existingSelectionMap.has(key)) {
+        // ❌ Duplicate found -> reject
+        return res.status(400).json({
+          message: `You have already selected ${selection.meal_type} for ${selection.meal_date}. You cannot select it again.`
         });
       }
+      newSelections.push({
+        ...selection,
+        userId,
+        is_default: false
+      });
     }
 
-    // ✅ Delete selections that are no longer in the new submission
-    const selectionsToDelete = Array.from(existingSelectionMap.values());
-    if (selectionsToDelete.length > 0) {
-      operations.push(
-        WeeklySelection.destroy({
-          where: { 
-            id: selectionsToDelete.map(s => s.id) 
-          }
-        })
-      );
-    }
-
-    // ✅ Create new selections if any
     if (newSelections.length > 0) {
-      operations.push(WeeklySelection.bulkCreate(newSelections));
+      await WeeklySelection.bulkCreate(newSelections);
     }
 
-    // ✅ Execute all database operations
-    await Promise.all(operations);
-
-    // ✅ Calculate extra charges only for NEW selections and UPDATED selections
+    // ✅ Calculate extra charges ONLY for new selections
     let totalExtraCharge = 0;
     const processedMenuItems = new Set();
 
-    for (const s of selections) {
-      // Only process each menu item once to avoid double counting
+    for (const s of newSelections) {
       if (!processedMenuItems.has(s.menuItemId)) {
         const menuItem = await MenuItem.findByPk(s.menuItemId);
         if (menuItem && menuItem.extra_price) {
@@ -204,7 +174,7 @@ exports.submitWeeklySelection = async (req, res) => {
       }
     }
 
-    // ✅ Only charge for net new extra charges
+    // ✅ Deduct from wallet if needed
     if (totalExtraCharge > 0) {
       const user = await User.findByPk(userId);
       if (!user) {
@@ -217,11 +187,10 @@ exports.submitWeeklySelection = async (req, res) => {
         });
       }
 
-      // ✅ Deduct from wallet
       user.wallet_balance = parseFloat(user.wallet_balance) - totalExtraCharge;
       await user.save();
 
-      // ✅ Log transaction (you should implement this)
+      // Optionally log transaction
       // await Transaction.create({
       //   userId,
       //   amount: -totalExtraCharge,
@@ -233,10 +202,9 @@ exports.submitWeeklySelection = async (req, res) => {
     res.status(201).json({
       message: 'Your weekly menu has been updated successfully!',
       total_extra_charge: totalExtraCharge,
-      added: newSelections.length,
-      updated: selections.length - newSelections.length - selectionsToDelete.length,
-      removed: selectionsToDelete.length
+      added: newSelections.length
     });
+
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
