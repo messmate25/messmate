@@ -118,71 +118,69 @@ exports.deleteWeeklyMenu = async (req, res) => {
 exports.getDashboardStats = async (req, res) => {
   try {
     const { MealHistory } = getModels(req);
-    const { Op, fn, col } = require("sequelize");
+    const { Op } = require("sequelize");
 
-    // === Daily stats ===
+    // Helper to aggregate item counts
+    const aggregateItems = (mealHistories) => {
+      const mealStats = {};
+
+      mealHistories.forEach(mh => {
+        const isValid = mh.is_valid ? 1 : 0;
+        let items = [];
+        try {
+          const qrData = JSON.parse(mh.qr_code_data);
+          items = qrData.items || [];
+        } catch (err) {
+          console.warn("Invalid QR data for meal_history id:", mh.id);
+        }
+
+        items.forEach(item => {
+          const name = item.name;
+          if (!mealStats[name]) {
+            mealStats[name] = { ordered: 0, served: 0, remaining: 0 };
+          }
+          mealStats[name].ordered += 1;
+          mealStats[name].remaining += isValid;
+          mealStats[name].served += 1 - isValid;
+        });
+      });
+
+      // Calculate totals
+      const total_orders = Object.values(mealStats).reduce((sum, i) => sum + i.ordered, 0);
+      const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
+      const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
+
+      return { total_orders, served, remaining, items: mealStats };
+    };
+
+    // --- Daily stats ---
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    const dailyCounts = await MealHistory.findAll({
-      where: { meal_date: today },
-      attributes: [
-        'meal_type',
-        [fn('COUNT', col('id')), 'total_orders'],
-        [fn('SUM', fn('CASE', fn('WHEN', col('is_valid'), 1, 0))), 'remaining_valid']
-      ],
-      group: ['meal_type']
+    const dailyMeals = await MealHistory.findAll({
+      where: { meal_date: { [Op.between]: [today, tomorrow] } }
     });
 
-    const dailyStats = {
-      breakfast: { total_orders: 0, served: 0, remaining: 0 },
-      lunch: { total_orders: 0, served: 0, remaining: 0 },
-      dinner: { total_orders: 0, served: 0, remaining: 0 },
-    };
-
-    dailyCounts.forEach(mc => {
-      const mealType = mc.getDataValue('meal_type');
-      const totalOrders = parseInt(mc.getDataValue('total_orders'));
-      const remaining = parseInt(mc.getDataValue('remaining_valid'));
-      const served = totalOrders - remaining;
-
-      if (dailyStats[mealType]) {
-        dailyStats[mealType] = { total_orders: totalOrders, served, remaining };
-      }
+    const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
+    ['breakfast', 'lunch', 'dinner'].forEach(type => {
+      const filtered = dailyMeals.filter(m => m.meal_type === type);
+      dailyStats[type] = aggregateItems(filtered);
     });
 
-    // === Weekly stats ===
-    const weekStart = new Date();
-    weekStart.setDate(today.getDate() - 6); // last 7 days
-    weekStart.setHours(0, 0, 0, 0);
+    // --- Weekly stats (last 7 days including today) ---
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - 6);
 
-    const weekCounts = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [weekStart, today] } },
-      attributes: [
-        'meal_type',
-        [fn('COUNT', col('id')), 'total_orders'],
-        [fn('SUM', fn('CASE', fn('WHEN', col('is_valid'), 1, 0))), 'remaining_valid']
-      ],
-      group: ['meal_type']
+    const weeklyMeals = await MealHistory.findAll({
+      where: { meal_date: { [Op.between]: [weekStart, today] } }
     });
 
-    const weeklyStats = {
-      breakfast: { total_orders: 0, served: 0, remaining: 0 },
-      lunch: { total_orders: 0, served: 0, remaining: 0 },
-      dinner: { total_orders: 0, served: 0, remaining: 0 },
-    };
-
-    weekCounts.forEach(mc => {
-      const mealType = mc.getDataValue('meal_type');
-      const totalOrders = parseInt(mc.getDataValue('total_orders'));
-      const remaining = parseInt(mc.getDataValue('remaining_valid'));
-      const served = totalOrders - remaining;
-
-      if (weeklyStats[mealType]) {
-        weeklyStats[mealType] = { total_orders: totalOrders, served, remaining };
-      }
+    const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
+    ['breakfast', 'lunch', 'dinner'].forEach(type => {
+      const filtered = weeklyMeals.filter(m => m.meal_type === type);
+      weeklyStats[type] = aggregateItems(filtered);
     });
 
     res.status(200).json({ dailyStats, weeklyStats });
