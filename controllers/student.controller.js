@@ -102,110 +102,181 @@ exports.getWeeklyMenu = async (req, res) => {
 };
 
 // --- Submit Weekly Menu Selection ---
-exports.submitWeeklySelection = async (req, res) => {
+exports.getDashboardStats = async (req, res) => {
   try {
-    const { WeeklySelection, MealHistory, MenuItem, User, Transaction } = getModels(req);
-    const userId = req.user.id;
-    const { selections, week_start_date } = req.body;
+    const { MealHistory, WeeklySelection, MenuItem } = getModels(req);
+    const { Op } = require("sequelize");
 
-    if (!selections || !week_start_date) {
-      return res.status(400).json({ message: 'Please provide selections and the week start date.' });
-    }
+    // Helper to aggregate item counts from Weekly Selections
+    const aggregateItems = (mealHistories, weeklySelections) => {
+      const mealStats = {};
+      const dayWiseStats = {};
 
-    // ✅ Validation: only one thali per meal (within the request)
-    const selectionsByDayMeal = {};
-    for (const s of selections) {
-      const key = `${s.meal_date}-${s.meal_type}`;
-      if (selectionsByDayMeal[key]) {
-        return res.status(400).json({ message: `You can only select one Thali per meal. Error on ${key}.` });
-      }
-      selectionsByDayMeal[key] = true;
-    }
-
-    const startDate = new Date(week_start_date);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6);
-
-    // ✅ Get existing selections (for duplicate check)
-    const existingSelections = await WeeklySelection.findAll({
-      where: { userId, meal_date: { [Op.between]: [startDate, endDate] } },
-      include: [{ model: MenuItem }]
-    });
-
-    // ✅ Create a map of existing selections for quick lookup
-    const existingSelectionMap = new Map();
-    existingSelections.forEach(selection => {
-      const key = `${selection.meal_date}-${selection.meal_type}`;
-      existingSelectionMap.set(key, selection);
-    });
-
-    // ✅ Prepare only NEW selections (no updates, no deletes)
-    const newSelections = [];
-    for (const selection of selections) {
-      const key = `${selection.meal_date}-${selection.meal_type}`;
-      if (existingSelectionMap.has(key)) {
-        // ❌ Duplicate found -> reject
-        return res.status(400).json({
-          message: `You have already selected ${selection.meal_type} for ${selection.meal_date}. You cannot select it again.`
-        });
-      }
-      newSelections.push({
-        ...selection,
-        userId,
-        is_default: false
-      });
-    }
-
-    if (newSelections.length > 0) {
-      await WeeklySelection.bulkCreate(newSelections);
-    }
-
-    // ✅ Calculate extra charges ONLY for new selections
-    let totalExtraCharge = 0;
-    const processedMenuItems = new Set();
-
-    for (const s of newSelections) {
-      if (!processedMenuItems.has(s.menuItemId)) {
-        const menuItem = await MenuItem.findByPk(s.menuItemId);
-        if (menuItem && menuItem.extra_price) {
-          totalExtraCharge += parseFloat(menuItem.extra_price);
-          processedMenuItems.add(s.menuItemId);
+      // Create a map of meal_date + meal_type to menu item from weekly selections
+      const selectionMap = {};
+      weeklySelections.forEach(ws => {
+        const key = `${ws.meal_date}-${ws.meal_type}`;
+        selectionMap[key] = {
+          menu_item_id: ws.menuItemId || ws.MenuItem?.id,
+          item_name: ws.MenuItem?.name || 'Unknown Item'
+        };
+        
+        // Initialize day-wise stats with weekly selection data
+        const mealDate = new Date(ws.meal_date).toISOString().split('T')[0];
+        if (!dayWiseStats[mealDate]) {
+          dayWiseStats[mealDate] = {
+            breakfast: { item_name: '', ordered: 0, served: 0, remaining: 0 },
+            lunch: { item_name: '', ordered: 0, served: 0, remaining: 0 },
+            dinner: { item_name: '', ordered: 0, served: 0, remaining: 0 }
+          };
         }
+        
+        // Set the item name for each meal type on that day (even if no orders yet)
+        dayWiseStats[mealDate][ws.meal_type].item_name = ws.MenuItem?.name || 'Unknown Item';
+      });
+
+      // Count orders and served meals from meal histories
+      mealHistories.forEach(mh => {
+        const key = `${mh.meal_date}-${mh.meal_type}`;
+        const selection = selectionMap[key];
+        
+        if (selection) {
+          const itemName = selection.item_name;
+          const mealDate = new Date(mh.meal_date).toISOString().split('T')[0];
+          
+          // Overall stats by item
+          if (!mealStats[itemName]) {
+            mealStats[itemName] = { ordered: 0, served: 0, remaining: 0 };
+          }
+          
+          mealStats[itemName].ordered += 1;
+          if (!mh.is_valid) {
+            mealStats[itemName].served += 1;
+          } else {
+            mealStats[itemName].remaining += 1;
+          }
+          
+          // Day-wise stats
+          if (dayWiseStats[mealDate] && dayWiseStats[mealDate][mh.meal_type]) {
+            dayWiseStats[mealDate][mh.meal_type].ordered += 1;
+            if (!mh.is_valid) {
+              dayWiseStats[mealDate][mh.meal_type].served += 1;
+            } else {
+              dayWiseStats[mealDate][mh.meal_type].remaining += 1;
+            }
+          }
+        }
+      });
+
+      // Ensure all weekly selections are represented in day_wise stats, even with zero orders
+      weeklySelections.forEach(ws => {
+        const mealDate = new Date(ws.meal_date).toISOString().split('T')[0];
+        const mealType = ws.meal_type;
+        
+        if (dayWiseStats[mealDate] && dayWiseStats[mealDate][mealType]) {
+          // If we have weekly selection but no meal history, ensure item name is set
+          if (dayWiseStats[mealDate][mealType].ordered === 0) {
+            dayWiseStats[mealDate][mealType].item_name = ws.MenuItem?.name || 'Unknown Item';
+          }
+        }
+      });
+
+      // Calculate totals for overall stats
+      const total_orders = Object.values(mealStats).reduce((sum, i) => sum + i.ordered, 0);
+      const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
+      const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
+
+      return { 
+        total_orders, 
+        served, 
+        remaining, 
+        items: mealStats,
+        day_wise: dayWiseStats 
+      };
+    };
+
+    // --- Daily stats ---
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    // Get ALL daily meals in one query (not filtered by type)
+    const dailyMeals = await MealHistory.findAll({
+      where: { 
+        meal_date: { 
+          [Op.between]: [today, tomorrow] 
+        } 
       }
-    }
-
-    // ✅ Deduct from wallet if needed
-    if (totalExtraCharge > 0) {
-      const user = await User.findByPk(userId);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-
-      if (parseFloat(user.wallet_balance) < totalExtraCharge) {
-        return res.status(400).json({
-          message: 'Insufficient wallet balance. Please recharge your wallet.'
-        });
-      }
-
-      user.wallet_balance = parseFloat(user.wallet_balance) - totalExtraCharge;
-      await user.save();
-
-      // Optionally log transaction
-      // await Transaction.create({
-      //   userId,
-      //   amount: -totalExtraCharge,
-      //   type: 'weekly_selection_extra_charge',
-      //   description: `Extra charges for weekly selections`
-      // });
-    }
-
-    res.status(201).json({
-      message: 'Your weekly menu has been updated successfully!',
-      total_extra_charge: totalExtraCharge,
-      added: newSelections.length
     });
 
+    // Get weekly selections for the same date range
+    const dailySelections = await WeeklySelection.findAll({
+      where: { 
+        meal_date: { 
+          [Op.between]: [today, tomorrow] 
+        } 
+      },
+      include: [{
+        model: MenuItem,
+        attributes: ['id', 'name']
+      }]
+    });
+
+    const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
+    
+    // Process each meal type with ALL daily meals (not filtered)
+    for (const type of ['breakfast', 'lunch', 'dinner']) {
+      // Filter weekly selections by meal type
+      const filteredSelections = dailySelections.filter(ws => ws.meal_type === type);
+      
+      // Use ALL daily meals but process only the relevant ones via the selection map
+      dailyStats[type] = aggregateItems(dailyMeals, filteredSelections);
+    }
+
+    // --- Weekly stats (last 7 days including today) ---
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+
+    // Get ALL weekly meals in one query
+    const weeklyMeals = await MealHistory.findAll({
+      where: { 
+        meal_date: { 
+          [Op.between]: [weekStart, tomorrow] // Use tomorrow to include today fully
+        } 
+      }
+    });
+
+    // Get weekly selections for the same date range
+    const weeklySelections = await WeeklySelection.findAll({
+      where: { 
+        meal_date: { 
+          [Op.between]: [weekStart, tomorrow] 
+        } 
+      },
+      include: [{
+        model: MenuItem,
+        attributes: ['id', 'name']
+      }]
+    });
+
+    const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
+    
+    for (const type of ['breakfast', 'lunch', 'dinner']) {
+      // Filter weekly selections by meal type
+      const filteredSelections = weeklySelections.filter(ws => ws.meal_type === type);
+      
+      // Use ALL weekly meals but process only the relevant ones via the selection map
+      weeklyStats[type] = aggregateItems(weeklyMeals, filteredSelections);
+    }
+
+    res.status(200).json({ 
+      dailyStats, 
+      weeklyStats 
+    });
   } catch (error) {
+    console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
