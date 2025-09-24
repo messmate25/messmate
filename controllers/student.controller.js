@@ -102,186 +102,228 @@ exports.getWeeklyMenu = async (req, res) => {
 };
 
 // --- Submit Weekly Menu Selection ---
-exports.getDashboardStats = async (req, res) => {
+// --- Submit Weekly Menu Selection ---
+exports.submitWeeklySelection = async (req, res) => {
   try {
-    const { MealHistory, WeeklySelection, MenuItem } = getModels(req);
-    const { Op } = require("sequelize");
+    const { WeeklySelection, MealHistory, MenuItem, User, Transaction } = getModels(req);
+    const userId = req.user.id;
+    const { selections, week_start_date } = req.body;
 
-    // Helper to aggregate item counts from Weekly Selections
-    const aggregateItems = (mealHistories, weeklySelections) => {
-      const mealStats = {};
-      const dayWiseStats = {};
+    if (!selections || !week_start_date) {
+      return res.status(400).json({ message: 'Please provide selections and the week start date.' });
+    }
 
-      // Create a map of meal_date + meal_type to menu item from weekly selections
-      const selectionMap = {};
-      weeklySelections.forEach(ws => {
-        const key = `${ws.meal_date}-${ws.meal_type}`;
-        selectionMap[key] = {
-          menu_item_id: ws.menuItemId || ws.MenuItem?.id,
-          item_name: ws.MenuItem?.name || 'Unknown Item'
-        };
-        
-        // Initialize day-wise stats with weekly selection data
-        const mealDate = new Date(ws.meal_date).toISOString().split('T')[0];
-        if (!dayWiseStats[mealDate]) {
-          dayWiseStats[mealDate] = {
-            breakfast: { item_name: '', ordered: 0, served: 0, remaining: 0 },
-            lunch: { item_name: '', ordered: 0, served: 0, remaining: 0 },
-            dinner: { item_name: '', ordered: 0, served: 0, remaining: 0 }
-          };
+    // ✅ Validation: only one thali per meal
+    const selectionsByDayMeal = {};
+    for (const s of selections) {
+      const key = `${s.meal_date}-${s.meal_type}`;
+      if (selectionsByDayMeal[key]) {
+        return res.status(400).json({ message: `You can only select one Thali per meal. Error on ${key}.` });
+      }
+      selectionsByDayMeal[key] = true;
+    }
+
+    const startDate = new Date(week_start_date);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+
+    // ✅ Get existing selections to compare and calculate charges properly
+    const existingSelections = await WeeklySelection.findAll({
+      where: { userId, meal_date: { [Op.between]: [startDate, endDate] } },
+      include: [{ model: MenuItem }]
+    });
+
+    // ✅ Create a map of existing selections for quick lookup
+    const existingSelectionMap = new Map();
+    existingSelections.forEach(selection => {
+      const key = `${selection.meal_date}-${selection.meal_type}`;
+      existingSelectionMap.set(key, selection);
+    });
+
+    // ✅ Prepare operations: create new or update existing
+    const operations = [];
+    const newSelections = [];
+    const updatedSelections = [];
+
+    for (const selection of selections) {
+      const key = `${selection.meal_date}-${selection.meal_type}`;
+      const existingSelection = existingSelectionMap.get(key);
+
+      if (existingSelection) {
+        // ✅ Update existing selection if menuItemId changed
+        if (existingSelection.menuItemId !== selection.menuItemId) {
+          operations.push(
+            WeeklySelection.update(
+              { menuItemId: selection.menuItemId },
+              { where: { id: existingSelection.id } }
+            )
+          );
+          updatedSelections.push(selection);
         }
-        
-        // Set the item name for each meal type on that day (even if no orders yet)
-        dayWiseStats[mealDate][ws.meal_type].item_name = ws.MenuItem?.name || 'Unknown Item';
-      });
+        // Remove from map to track what remains (needs to be deleted)
+        existingSelectionMap.delete(key);
+      } else {
+        // ✅ Create new selection
+        newSelections.push({
+          ...selection,
+          userId,
+          is_default: false
+        });
+      }
+    }
 
-      // Count orders and served meals from meal histories
-      mealHistories.forEach(mh => {
-        const key = `${mh.meal_date}-${mh.meal_type}`;
-        const selection = selectionMap[key];
-        
-        if (selection) {
-          const itemName = selection.item_name;
-          const mealDate = new Date(mh.meal_date).toISOString().split('T')[0];
-          
-          // Overall stats by item
-          if (!mealStats[itemName]) {
-            mealStats[itemName] = { ordered: 0, served: 0, remaining: 0 };
+    // ✅ Delete selections that are no longer in the new submission
+    const selectionsToDelete = Array.from(existingSelectionMap.values());
+    if (selectionsToDelete.length > 0) {
+      operations.push(
+        WeeklySelection.destroy({
+          where: { 
+            id: selectionsToDelete.map(s => s.id) 
           }
-          
-          mealStats[itemName].ordered += 1;
-          if (!mh.is_valid) {
-            mealStats[itemName].served += 1;
-          } else {
-            mealStats[itemName].remaining += 1;
-          }
-          
-          // Day-wise stats
-          if (dayWiseStats[mealDate] && dayWiseStats[mealDate][mh.meal_type]) {
-            dayWiseStats[mealDate][mh.meal_type].ordered += 1;
-            if (!mh.is_valid) {
-              dayWiseStats[mealDate][mh.meal_type].served += 1;
-            } else {
-              dayWiseStats[mealDate][mh.meal_type].remaining += 1;
-            }
-          }
+        })
+      );
+    }
+
+    // ✅ Create new selections if any
+    if (newSelections.length > 0) {
+      operations.push(WeeklySelection.bulkCreate(newSelections));
+    }
+
+    // ✅ Execute all database operations
+    await Promise.all(operations);
+
+    // ✅ Calculate extra charges only for NEW selections and UPDATED selections
+    let totalExtraCharge = 0;
+    const processedMenuItems = new Set();
+
+    for (const s of selections) {
+      // Only process each menu item once to avoid double counting
+      if (!processedMenuItems.has(s.menuItemId)) {
+        const menuItem = await MenuItem.findByPk(s.menuItemId);
+        if (menuItem && menuItem.extra_price) {
+          totalExtraCharge += parseFloat(menuItem.extra_price);
+          processedMenuItems.add(s.menuItemId);
         }
-      });
+      }
+    }
 
-      // Ensure all weekly selections are represented in day_wise stats, even with zero orders
-      weeklySelections.forEach(ws => {
-        const mealDate = new Date(ws.meal_date).toISOString().split('T')[0];
-        const mealType = ws.meal_type;
-        
-        if (dayWiseStats[mealDate] && dayWiseStats[mealDate][mealType]) {
-          // If we have weekly selection but no meal history, ensure item name is set
-          if (dayWiseStats[mealDate][mealType].ordered === 0) {
-            dayWiseStats[mealDate][mealType].item_name = ws.MenuItem?.name || 'Unknown Item';
-          }
-        }
-      });
+    // ✅ Only charge for net new extra charges
+    if (totalExtraCharge > 0) {
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
 
-      // Calculate totals for overall stats
-      const total_orders = Object.values(mealStats).reduce((sum, i) => sum + i.ordered, 0);
-      const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
-      const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
+      if (parseFloat(user.wallet_balance) < totalExtraCharge) {
+        return res.status(400).json({
+          message: 'Insufficient wallet balance. Please recharge your wallet.'
+        });
+      }
 
-      return { 
-        total_orders, 
-        served, 
-        remaining, 
-        items: mealStats,
-        day_wise: dayWiseStats 
-      };
+      // ✅ Deduct from wallet
+      user.wallet_balance = parseFloat(user.wallet_balance) - totalExtraCharge;
+      await user.save();
+
+      // ✅ Log transaction (you should implement this)
+      // await Transaction.create({
+      //   userId,
+      //   amount: -totalExtraCharge,
+      //   type: 'weekly_selection_extra_charge',
+      //   description: `Extra charges for weekly selections`
+      // });
+    }
+
+    // ✅ Prepare the response first
+    const response = {
+      message: 'Your weekly menu has been updated successfully!',
+      total_extra_charge: totalExtraCharge,
+      added: newSelections.length,
+      updated: updatedSelections.length,
+      removed: selectionsToDelete.length
     };
 
-    // --- Daily stats ---
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
+    // ✅ Send response immediately
+    res.status(201).json(response);
 
-    // Get ALL daily meals in one query (not filtered by type)
-    const dailyMeals = await MealHistory.findAll({
-      where: { 
-        meal_date: { 
-          [Op.between]: [today, tomorrow] 
-        } 
-      }
-    });
+    // ✅ Now call generateMealQR for each selection in the background (non-blocking)
+    // This happens after the response is sent, so it doesn't affect the client
+    generateQRsInBackground(selections, userId, req);
 
-    // Get weekly selections for the same date range
-    const dailySelections = await WeeklySelection.findAll({
-      where: { 
-        meal_date: { 
-          [Op.between]: [today, tomorrow] 
-        } 
-      },
-      include: [{
-        model: MenuItem,
-        attributes: ['id', 'name']
-      }]
-    });
-
-    const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
-    
-    // Process each meal type with ALL daily meals (not filtered)
-    for (const type of ['breakfast', 'lunch', 'dinner']) {
-      // Filter weekly selections by meal type
-      const filteredSelections = dailySelections.filter(ws => ws.meal_type === type);
-      
-      // Use ALL daily meals but process only the relevant ones via the selection map
-      dailyStats[type] = aggregateItems(dailyMeals, filteredSelections);
-    }
-
-    // --- Weekly stats (last 7 days including today) ---
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - 6);
-    weekStart.setHours(0, 0, 0, 0);
-
-    // Get ALL weekly meals in one query
-    const weeklyMeals = await MealHistory.findAll({
-      where: { 
-        meal_date: { 
-          [Op.between]: [weekStart, tomorrow] // Use tomorrow to include today fully
-        } 
-      }
-    });
-
-    // Get weekly selections for the same date range
-    const weeklySelections = await WeeklySelection.findAll({
-      where: { 
-        meal_date: { 
-          [Op.between]: [weekStart, tomorrow] 
-        } 
-      },
-      include: [{
-        model: MenuItem,
-        attributes: ['id', 'name']
-      }]
-    });
-
-    const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
-    
-    for (const type of ['breakfast', 'lunch', 'dinner']) {
-      // Filter weekly selections by meal type
-      const filteredSelections = weeklySelections.filter(ws => ws.meal_type === type);
-      
-      // Use ALL weekly meals but process only the relevant ones via the selection map
-      weeklyStats[type] = aggregateItems(weeklyMeals, filteredSelections);
-    }
-
-    res.status(200).json({ 
-      dailyStats, 
-      weeklyStats 
-    });
   } catch (error) {
-    console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
 
-// --- Generate QR Code for a specific meal ---
+// ✅ Helper function to generate QR codes in the background
+async function generateQRsInBackground(selections, userId, req) {
+  try {
+    const { WeeklySelection, MenuItem, MealHistory } = getModels(req);
+    
+    for (const selection of selections) {
+      const { meal_date, meal_type } = selection;
+      
+      try {
+        // Check if QR already exists for this user, meal_date, and meal_type
+        const existingQR = await MealHistory.findOne({
+          where: { userId, meal_date, meal_type }
+        });
+
+        if (existingQR) {
+          console.log(`QR already exists for ${meal_type} on ${meal_date}. Skipping.`);
+          continue;
+        }
+
+        // Find the user's weekly selection for that meal & date
+        const weeklySelection = await WeeklySelection.findOne({
+          where: { userId, meal_date, meal_type },
+          include: [{ model: MenuItem, attributes: ["id", "name", "description", "image_url"] }],
+        });
+
+        if (!weeklySelection) {
+          console.log(`No selection found for ${meal_type} on ${meal_date}. Skipping.`);
+          continue;
+        }
+
+        // Prepare QR payload
+        const qrPayload = {
+          userId,
+          userName: req.user.name,
+          meal_date,
+          meal_type,
+          items: [
+            {
+              id: weeklySelection.MenuItem.id,
+              name: weeklySelection.MenuItem.name,
+              description: weeklySelection.MenuItem.description,
+              image_url: weeklySelection.MenuItem.image_url,
+            },
+          ],
+        };
+
+        // Save in meal_history table
+        await MealHistory.create({
+          userId,
+          meal_date,
+          meal_type,
+          menu_item_id: weeklySelection.MenuItem.id,
+          qr_code_data: JSON.stringify(qrPayload),
+          is_valid: true,
+        });
+
+        console.log(`QR generated successfully for ${meal_type} on ${meal_date}`);
+        
+      } catch (qrError) {
+        console.error(`Error generating QR for ${meal_type} on ${meal_date}:`, qrError);
+        // Don't throw here - continue with other selections
+      }
+    }
+  } catch (error) {
+    console.error('Error in background QR generation:', error);
+    // Don't throw - this is background processing
+  }
+}
+
+// --- Generate QR Code for a specific meal --- (unchanged)
 exports.generateMealQR = async (req, res) => {
   try {
     const { WeeklySelection, MenuItem, MealHistory } = getModels(req);
@@ -294,25 +336,14 @@ exports.generateMealQR = async (req, res) => {
 
     // Check if QR already exists for this user, meal_date, and meal_type
     const existingQR = await MealHistory.findOne({
-      where: { userId, meal_date, meal_type }
+      where: { userId, meal_date, meal_type  }
     }); 
 
     if (existingQR) {
-      // ✅ If QR exists but is invalid (already scanned), don't allow regeneration
-      if (!existingQR.is_valid) {
-        return res.status(409).json({
-          message: `QR code for ${meal_type} on ${meal_date} has already been scanned and cannot be regenerated.`,
-          scanned: true,
-          scanned_at: existingQR.scanned_at // assuming you have this field
-        });
-      }
-      
-      // ✅ If QR exists and is still valid, return the existing QR data
-      return res.status(200).json({
-        message: `QR code for ${meal_type} on ${meal_date} is still valid.`,
+      return res.status(409).json({
+        message: `QR already generated for ${meal_type} on ${meal_date}.`,
         qr_code_payload: JSON.parse(existingQR.qr_code_data),
-        meal_history_id: existingQR.id,
-        is_valid: existingQR.is_valid
+        meal_history_id: existingQR.id
       });
     }
 
@@ -358,16 +389,13 @@ exports.generateMealQR = async (req, res) => {
     return res.status(200).json({
       message: "QR generated successfully.",
       qr_code_payload: qrPayload,
-      meal_history_id: mealHistory.id,
-      is_valid: true
+      meal_history_id: mealHistory.id, // helps track this QR later
     });
   } catch (error) {
     console.error("generateMealQR error:", error);
     res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
-
-
 
 // --- Get Monthly Usage Statistics ---
 exports.getUsageStats = async (req, res) => {
@@ -483,7 +511,7 @@ exports.previewWeeklySelection = async (req, res) => {
 exports.getWeeklySelections = async (req, res) => {
   try {
     // Await models
-    const { WeeklySelection, MenuItem } = await getModels(req);
+    const { WeeklySelection, MenuItem } =  getModels(req);
 
     const userId = req.user.id;
 
