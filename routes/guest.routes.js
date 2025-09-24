@@ -16,6 +16,6 @@ router.get('/weekly-menu', guestController.getWeeklyMenu);
 // POST /api/guest/order
 router.post('/order', guestController.placeOrder);
 router.get('/guestOrders/:id', guestController.getGuestOrdersById);
-router.get("/menu-items", guestController.getMenuItems);
+router.get('/menu-items', guestController.getMenuItems);
 
 module.exports = router;
