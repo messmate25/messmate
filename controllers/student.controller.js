@@ -334,8 +334,6 @@ exports.previewWeeklySelection = async (req, res) => {
   }
 };
 
-// GET /student/weekly-selections
-
 exports.getWeeklySelections = async (req, res) => {
   try {
     // Await models
