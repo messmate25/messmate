@@ -559,8 +559,7 @@ exports.getAllGuestsWithOrders = async (req, res) => {
 exports.updateGuestOrderStatus = async (req, res) => {
   try {
     const { GuestOrder } = getModels(req);
-    const { orderId } = req.params;
-    const { status } = req.body;
+    const { orderId , status } = req.body;
 
     if (!status || !["ordered", "preparing", "prepared", "served"].includes(status)) {
       return res.status(400).json({ message: "Invalid status value." });
@@ -584,4 +583,3 @@ exports.updateGuestOrderStatus = async (req, res) => {
     res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
-
