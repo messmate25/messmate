@@ -115,6 +115,7 @@ exports.deleteWeeklyMenu = async (req, res) => {
 };
 
 // --- Dashboard ---
+// --- Dashboard ---
 exports.getDashboardStats = async (req, res) => {
   try {
     const { MealHistory } = getModels(req);
@@ -125,7 +126,11 @@ exports.getDashboardStats = async (req, res) => {
       const mealStats = {};
 
       mealHistories.forEach(mh => {
-        const isValid = mh.is_valid ? 1 : 0;
+        // is_valid = false means meal is SERVED
+        // is_valid = true means meal is REMAINING (not served yet)
+        const isServed = !mh.is_valid ? 1 : 0;
+        const isRemaining = mh.is_valid ? 1 : 0;
+        
         let items = [];
         try {
           const qrData = JSON.parse(mh.qr_code_data);
@@ -140,8 +145,8 @@ exports.getDashboardStats = async (req, res) => {
             mealStats[name] = { ordered: 0, served: 0, remaining: 0 };
           }
           mealStats[name].ordered += 1;
-          mealStats[name].remaining += isValid;
-          mealStats[name].served += 1 - isValid;
+          mealStats[name].served += isServed;  // Count if served (is_valid = false)
+          mealStats[name].remaining += isRemaining;  // Count if remaining (is_valid = true)
         });
       });
 
@@ -169,16 +174,12 @@ exports.getDashboardStats = async (req, res) => {
       dailyStats[type] = aggregateItems(filtered);
     });
 
-
-
-    
-
     // --- Weekly stats (last 7 days including today) ---
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - 6);
 
     const weeklyMeals = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [weekStart, today] } }
+      where: { meal_date: { [Op.between]: [weekStart, tomorrow] } } // Include today
     });
 
     const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
