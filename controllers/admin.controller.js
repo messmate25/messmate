@@ -117,11 +117,11 @@ exports.deleteWeeklyMenu = async (req, res) => {
 // --- Dashboard ---
 exports.getDashboardStats = async (req, res) => {
   try {
-    const { MealHistory } = getModels(req);
+    const { MealHistory, WeeklySelection } = getModels(req);
     const { Op } = require("sequelize");
 
-    // Helper to aggregate item counts
-    const aggregateItems = (mealHistories) => {
+    // Helper to aggregate item counts from MealHistory (served/remaining)
+    const aggregateMealHistoryItems = (mealHistories) => {
       const mealStats = {};
 
       mealHistories.forEach(mh => {
@@ -137,20 +137,39 @@ exports.getDashboardStats = async (req, res) => {
         items.forEach(item => {
           const name = item.name;
           if (!mealStats[name]) {
-            mealStats[name] = { ordered: 0, served: 0, remaining: 0 };
+            mealStats[name] = { served: 0, remaining: 0 };
           }
-          mealStats[name].ordered += 1;
           mealStats[name].remaining += isValid;
           mealStats[name].served += 1 - isValid;
         });
       });
 
-      // Calculate totals
-      const total_orders = Object.values(mealStats).reduce((sum, i) => sum + i.ordered, 0);
-      const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
-      const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
+      return mealStats;
+    };
 
-      return { total_orders, served, remaining, items: mealStats };
+    // Helper to get day-wise ordered items from WeeklySelections
+    const getOrderedItemsFromSelections = (selections) => {
+      const dayWiseOrders = {};
+      
+      selections.forEach(selection => {
+        const dateStr = selection.meal_date.toISOString().split('T')[0];
+        const mealType = selection.meal_type;
+        
+        if (!dayWiseOrders[dateStr]) {
+          dayWiseOrders[dateStr] = { breakfast: [], lunch: [], dinner: [] };
+        }
+        
+        // Since WeeklySelection doesn't have items, we'll track the selection itself
+        // You might need to adjust this based on how you want to represent "ordered items"
+        dayWiseOrders[dateStr][mealType].push({
+          selection_id: selection.id,
+          is_default: selection.is_default,
+          meal_type: meal_type,
+          meal_date: selection.meal_date
+        });
+      });
+      
+      return dayWiseOrders;
     };
 
     // --- Daily stats ---
@@ -163,10 +182,33 @@ exports.getDashboardStats = async (req, res) => {
       where: { meal_date: { [Op.between]: [today, tomorrow] } }
     });
 
+    const dailySelections = await WeeklySelection.findAll({
+      where: { meal_date: { [Op.between]: [today, tomorrow] } }
+    });
+
     const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
+    const dailyOrders = { breakfast: 0, lunch: 0, dinner: 0 };
+
     ['breakfast', 'lunch', 'dinner'].forEach(type => {
-      const filtered = dailyMeals.filter(m => m.meal_type === type);
-      dailyStats[type] = aggregateItems(filtered);
+      const filteredMeals = dailyMeals.filter(m => m.meal_type === type);
+      const filteredSelections = dailySelections.filter(ws => ws.meal_type === type);
+      
+      // Get served/remaining stats from meal history
+      const mealStats = aggregateMealHistoryItems(filteredMeals);
+      
+      // Count orders from weekly selections (each selection represents an order)
+      dailyOrders[type] = filteredSelections.length;
+      
+      // Calculate totals for each meal type
+      const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
+      const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
+      
+      dailyStats[type] = {
+        total_orders: filteredSelections.length,
+        served: served,
+        remaining: remaining,
+        items: mealStats
+      };
     });
 
     // --- Weekly stats (last 7 days including today) ---
@@ -174,16 +216,42 @@ exports.getDashboardStats = async (req, res) => {
     weekStart.setDate(today.getDate() - 6);
 
     const weeklyMeals = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [weekStart, today] } }
+      where: { meal_date: { [Op.between]: [weekStart, tomorrow] } }
+    });
+
+    const weeklySelections = await WeeklySelection.findAll({
+      where: { meal_date: { [Op.between]: [weekStart, tomorrow] } }
     });
 
     const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
+    const weeklyOrders = { breakfast: 0, lunch: 0, dinner: 0 };
+
     ['breakfast', 'lunch', 'dinner'].forEach(type => {
-      const filtered = weeklyMeals.filter(m => m.meal_type === type);
-      weeklyStats[type] = aggregateItems(filtered);
+      const filteredMeals = weeklyMeals.filter(m => m.meal_type === type);
+      const filteredSelections = weeklySelections.filter(ws => ws.meal_type === type);
+      
+      const mealStats = aggregateMealHistoryItems(filteredMeals);
+      weeklyOrders[type] = filteredSelections.length;
+      
+      const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
+      const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
+      
+      weeklyStats[type] = {
+        total_orders: filteredSelections.length,
+        served: served,
+        remaining: remaining,
+        items: mealStats
+      };
     });
 
-    res.status(200).json({ dailyStats, weeklyStats });
+    // --- Day-wise ordered items from WeeklySelections ---
+    const dayWiseOrderedItems = getOrderedItemsFromSelections(weeklySelections);
+
+    res.status(200).json({ 
+      dailyStats, 
+      weeklyStats, 
+      dayWiseOrders: dayWiseOrderedItems 
+    });
   } catch (error) {
     console.error("Dashboard Stats Error:", error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
