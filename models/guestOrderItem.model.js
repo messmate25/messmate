@@ -26,6 +26,7 @@ module.exports = (sequelize) => {
     },
     {
       tableName: "guest_order_items",
+      
     }
   );
 

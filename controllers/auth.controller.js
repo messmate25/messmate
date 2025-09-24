@@ -181,7 +181,7 @@ exports.guestVerifyOTP = async (req, res) => {
     const token = jwt.sign(
       { id: guest.id, name: guest.name, email: guest.mobile_number, role: "guest" },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "72h" }
     );
 
     res.status(200).json({
