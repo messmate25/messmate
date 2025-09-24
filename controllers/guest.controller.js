@@ -74,15 +74,15 @@ exports.placeOrder = async (req, res) => {
       return res.status(400).json({ message: "One or more selected menu items are invalid." });
     }
 
-    // ✅ Calculate Estimated Ready Time (Max prep time among selected items)
-    const maxPrepMinutes = Math.max(...menuItems.map((m) => m.estimated_prep_time));
-    const estimatedReadyTime = new Date(Date.now() + maxPrepMinutes * 60 * 1000);
+    // ✅ Get Estimated Prep Time Text (from MenuItem)
+    // If multiple items, we can join their prep times as text
+    const estimatedPrepText = menuItems.map((m) => m.estimated_prep_time).join(", ");
 
     // ✅ Create Guest Order
     const order = await GuestOrder.create({
       guestId,
       status: "ordered",
-      estimated_preparation_time: estimatedReadyTime,
+      estimated_preparation_time: estimatedPrepText, // storing text directly
     });
 
     // ✅ Create Order Items
@@ -98,7 +98,7 @@ exports.placeOrder = async (req, res) => {
       message: "Order placed successfully!",
       orderId: order.id,
       status: order.status,
-      estimated_preparation_time: estimatedReadyTime,
+      estimated_preparation_time: estimatedPrepText,
       items: orderItems,
     });
   } catch (error) {
@@ -106,6 +106,7 @@ exports.placeOrder = async (req, res) => {
     res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
+
 
 
 // controllers/order.controller.js
