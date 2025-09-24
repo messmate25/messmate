@@ -15,5 +15,5 @@ router.get('/weekly-menu', guestController.getWeeklyMenu);
 
 // POST /api/guest/order
 router.post('/order', guestController.placeOrder);
-
+router.get('/guestOrders/:id', guestController.getGuestOrdersById);
 module.exports = router;

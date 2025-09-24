@@ -509,3 +509,78 @@ exports.deleteMenuItem = async (req, res) => {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
+
+// controllers/order.controller.js
+
+exports.getAllGuestsWithOrders = async (req, res) => {
+  try {
+    const { Guest, GuestOrder, GuestOrderItem, MenuItem } = getModels(req);
+
+    // Fetch all guests with their orders and order items
+    const guests = await Guest.findAll({
+      include: [
+        {
+          model: GuestOrder,
+          as: "orders",
+          include: [
+            {
+              model: GuestOrderItem,
+              as: "items",
+              include: [
+                {
+                  model: MenuItem,
+                  as: "menuItem",
+                  attributes: ["id", "name", "description", "estimated_prep_time", "extra_price"]
+                }
+              ]
+            }
+          ],
+          order: [["order_date", "DESC"]]
+        }
+      ],
+      order: [["id", "ASC"]]
+    });
+
+    res.status(200).json({
+      message: "Guests with orders fetched successfully.",
+      count: guests.length,
+      guests
+    });
+  } catch (error) {
+    console.error("Error fetching guests with orders:", error);
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
+  }
+};
+
+
+// controllers/order.controller.js
+
+exports.updateGuestOrderStatus = async (req, res) => {
+  try {
+    const { GuestOrder } = getModels(req);
+    const { orderId , status } = req.body;
+
+    if (!status || !["ordered", "preparing", "prepared", "served"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value." });
+    }
+
+    const order = await GuestOrder.findByPk(orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found." });
+    }
+
+    order.status = status;
+    await order.save();
+
+    res.status(200).json({
+      message: "Order status updated successfully.",
+      orderId: order.id,
+      status: order.status
+    });
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
+  }
+};
+

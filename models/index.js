@@ -6,6 +6,8 @@ const WeeklyMenuModel = require("./weeklyMenu.model");
 const WeeklySelectionModel = require("./weeklySelection.model");
 const MealHistoryModel = require("./mealHistory.model");
 const GuestModel = require("./guest.model");
+const GuestOrderItemModel = require("./guestOrderItem.model");
+const GuestOrderModel = require("./guestOrder.model");
 const TransactionModel = require("./transaction.model");   // ✅
 
 async function initModels() {
@@ -17,6 +19,8 @@ async function initModels() {
   const WeeklySelection = WeeklySelectionModel(sequelize);
   const MealHistory = MealHistoryModel(sequelize);
   const Guest = GuestModel(sequelize);
+  const GuestOrderItem = GuestOrderItemModel(sequelize);
+  const GuestOrder = GuestOrderModel(sequelize);
   const Transaction = TransactionModel(sequelize);   // ✅
 
   // --- Associations ---
@@ -32,15 +36,21 @@ async function initModels() {
   WeeklySelection.belongsTo(MenuItem, { foreignKey: "menuItemId" });
 
   // User/Guest <-> MealHistory
-
+  GuestOrderItem.belongsTo(MenuItem, { foreignKey: "menu_item_id", as: "menuItem" });
+  MenuItem.hasMany(GuestOrderItem, { foreignKey: "menu_item_id", as: "orderItems" });
+  GuestOrder.hasMany(GuestOrderItem, { foreignKey: "orderId", as: "items" });
+  GuestOrderItem.belongsTo(GuestOrder, { foreignKey: "orderId", as: "order" });
+  Guest.hasMany(GuestOrder, { foreignKey: "guestId", as: "orders" });
+  GuestOrder.belongsTo(Guest, { foreignKey: "guestId", as: "guest" });
   // User <-> Transaction
   User.hasMany(Transaction, { foreignKey: "userId" });
   Transaction.belongsTo(User, { foreignKey: "userId" });
 
-  return { 
-    sequelize, 
-    User, Guest, 
-    MenuItem, WeeklyMenu, WeeklySelection, 
+  return {
+    sequelize,
+    User, Guest,
+    MenuItem, WeeklyMenu, WeeklySelection, GuestOrder,        // ✅ returning new model
+    GuestOrderItem,   
     MealHistory, Transaction   // ✅ include new model
   };
 }

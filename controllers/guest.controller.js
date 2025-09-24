@@ -49,54 +49,113 @@ exports.getWeeklyMenu = async (req, res) => {
 };
 
 // --- Place an order for a meal ---
+// controllers/order.controller.js
 exports.placeOrder = async (req, res) => {
   try {
-    const { Guest, MenuItem, MealHistory } = getModels(req);
+    const { Guest, MenuItem, GuestOrder, GuestOrderItem } = getModels(req);
     const guestId = req.user.id;
-    const { menuItemId, meal_date, meal_type } = req.body;
+    const { items } = req.body;
+    // Expected: items = [{ menuItemId: 1, quantity: 2 }, { menuItemId: 3, quantity: 1 }]
 
-    if (!menuItemId || !meal_date || !meal_type) {
-      return res.status(400).json({ message: 'A Thali selection (menuItemId), meal_date, and meal_type are required.' });
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "At least one menu item is required." });
     }
 
     const guest = await Guest.findByPk(guestId);
     if (!guest) {
-      return res.status(404).json({ message: 'Guest profile not found.' });
+      return res.status(404).json({ message: "Guest profile not found." });
     }
 
-    const menuItem = await MenuItem.findByPk(menuItemId);
-    if (!menuItem) {
-      return res.status(404).json({ message: 'Selected Thali not found.' });
+    // ✅ Validate Menu Items
+    const menuItemIds = items.map((i) => i.menuItemId);
+    const menuItems = await MenuItem.findAll({ where: { id: menuItemIds } });
+
+    if (menuItems.length !== menuItemIds.length) {
+      return res.status(400).json({ message: "One or more selected menu items are invalid." });
     }
 
+    // ✅ Calculate Estimated Ready Time (Max prep time among selected items)
+    const maxPrepMinutes = Math.max(...menuItems.map((m) => m.estimated_prep_time));
+    const estimatedReadyTime = new Date(Date.now() + maxPrepMinutes * 60 * 1000);
 
-
-    const qrPayload = {
-      guestId: guest.id,
-      name: guest.name,
-      meal_date,
-      meal_type,
-      items: [{ id: menuItem.id, name: menuItem.name }] // Guest order is a single Thali
-    };
-
-    await MealHistory.create({
-      userId: guestId,
-      meal_date,
-      meal_type,
-      menu_item_id: menuItemId,
-      is_valid: false,
-      qr_code_data: JSON.stringify(qrPayload),
-      scanned_at: new Date()
+    // ✅ Create Guest Order
+    const order = await GuestOrder.create({
+      guestId,
+      status: "ordered",
+      estimated_preparation_time: estimatedReadyTime,
     });
 
-    const qrCodeDataURL = await qrcode.toDataURL(JSON.stringify(qrPayload));
+    // ✅ Create Order Items
+    const orderItems = items.map((i) => ({
+      orderId: order.id,
+      menu_item_id: i.menuItemId,
+      quantity: i.quantity || 1,
+    }));
+
+    await GuestOrderItem.bulkCreate(orderItems);
+
+    res.status(201).json({
+      message: "Order placed successfully!",
+      orderId: order.id,
+      status: order.status,
+      estimated_preparation_time: estimatedReadyTime,
+      items: orderItems,
+    });
+  } catch (error) {
+    console.error("Error placing guest order:", error);
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
+  }
+};
+
+
+// controllers/order.controller.js
+
+// controllers/order.controller.js
+
+exports.getGuestOrdersById = async (req, res) => {
+  try {
+    const { GuestOrder, GuestOrderItem, MenuItem, Guest } = getModels(req);
+    const guestId = req.params.guestId;
+
+    // Validate guestId
+    if (!guestId) {
+      return res.status(400).json({ message: "Guest ID is required." });
+    }
+
+    const guest = await Guest.findByPk(guestId);
+    if (!guest) {
+      return res.status(404).json({ message: "Guest not found." });
+    }
+
+    const orders = await GuestOrder.findAll({
+      where: { guestId },
+      include: [
+        {
+          model: GuestOrderItem,
+          as: "items",
+          include: [
+            {
+              model: MenuItem,
+              as: "menuItem",
+              attributes: ["id", "name", "description", "estimated_prep_time", "extra_price"]
+            }
+          ]
+        }
+      ],
+      order: [["order_date", "DESC"]] // latest orders first
+    });
 
     res.status(200).json({
-      message: 'Order placed successfully!',
-      qr_code_url: qrCodeDataURL,
+      message: `Orders for guest ${guest.name} fetched successfully.`,
+      guest: {
+        id: guest.id,
+        name: guest.name
+      },
+      count: orders.length,
+      orders
     });
-
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    console.error("Error fetching guest orders:", error);
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };
