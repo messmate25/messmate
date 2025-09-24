@@ -334,20 +334,29 @@ exports.generateMealQR = async (req, res) => {
       return res.status(400).json({ message: "Please provide both meal_date and meal_type." });
     }
 
-    // Check if QR already exists for this user, meal_date, and meal_type
+    // ✅ Check if QR already exists for this user, meal_date, and meal_type
     const existingQR = await MealHistory.findOne({
-      where: { userId, meal_date, meal_type  }
-    }); 
+      where: { userId, meal_date, meal_type }
+    });
 
     if (existingQR) {
-      return res.status(409).json({
-        message: `QR already generated for ${meal_type} on ${meal_date}.`,
-        qr_code_payload: JSON.parse(existingQR.qr_code_data),
-        meal_history_id: existingQR.id
-      });
+      if (existingQR.is_valid) {
+        // ✅ Return the already existing valid QR without updating DB
+        return res.status(200).json({
+          message: `QR already generated for ${meal_type} on ${meal_date}.`,
+          qr_code_payload: JSON.parse(existingQR.qr_code_data),
+          meal_history_id: existingQR.id
+        });
+      } else {
+        // ❌ If QR exists but is invalid, return QR expired message
+        return res.status(410).json({ 
+          message: `QR for ${meal_type} on ${meal_date} is expired.`,
+          meal_history_id: existingQR.id
+        });
+      }
     }
 
-    // Find the user's weekly selection for that meal & date
+    // ✅ Find the user's weekly selection for that meal & date
     const selection = await WeeklySelection.findOne({
       where: { userId, meal_date, meal_type },
       include: [{ model: MenuItem, attributes: ["id", "name", "description", "image_url"] }],
@@ -359,7 +368,7 @@ exports.generateMealQR = async (req, res) => {
       });
     }
 
-    // Prepare QR payload
+    // ✅ Prepare QR payload
     const qrPayload = {
       userId,
       userName: req.user.name,
@@ -375,7 +384,7 @@ exports.generateMealQR = async (req, res) => {
       ],
     };
 
-    // Save in meal_history table
+    // ✅ Save in meal_history table
     const mealHistory = await MealHistory.create({
       userId,
       meal_date,
@@ -385,12 +394,13 @@ exports.generateMealQR = async (req, res) => {
       is_valid: true,
     });
 
-    // Return QR payload + database reference
+    // ✅ Return QR payload + database reference
     return res.status(200).json({
       message: "QR generated successfully.",
       qr_code_payload: qrPayload,
-      meal_history_id: mealHistory.id, // helps track this QR later
+      meal_history_id: mealHistory.id,
     });
+
   } catch (error) {
     console.error("generateMealQR error:", error);
     res.status(500).json({ message: "Something went wrong.", error: error.message });
