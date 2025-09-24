@@ -186,7 +186,7 @@ exports.guestVerifyOTP = async (req, res) => {
 
     res.status(200).json({
       message: "Guest logged in successfully!",
-      result: { id: guest.id, role: "guest" },
+      result: { id: guest.id, name:guest.name , role: "guest" },
       token,
     });
   } catch (error) {
