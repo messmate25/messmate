@@ -121,11 +121,17 @@ exports.getDashboardStats = async (req, res) => {
     const { MealHistory } = getModels(req);
     const { Op } = require("sequelize");
 
-    const formatDate = (d) => d.toISOString().split('T')[0];
+    // --- Helper: format a Date object to YYYY-MM-DD ---
+    const formatDate = (date) => {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
 
     // --- Daily stats ---
     const todayObj = new Date();
-    todayObj.setHours(0, 0, 0, 0);
+    todayObj.setHours(0, 0, 0, 0); // ensure local midnight
     const today = formatDate(todayObj);
 
     const dailyMeals = await MealHistory.findAll({
@@ -133,8 +139,8 @@ exports.getDashboardStats = async (req, res) => {
     });
 
     // --- Weekly stats (Monday to Sunday) ---
-    const currentDay = todayObj.getDay(); // Sunday=0, Monday=1, ...
-    const daysSinceMonday = (currentDay + 6) % 7; // convert Sunday=0 → Monday=0
+    const currentDay = todayObj.getDay(); // Sunday=0, Monday=1...
+    const daysSinceMonday = (currentDay + 6) % 7; // shift so Monday=0
     const mondayObj = new Date(todayObj);
     mondayObj.setDate(todayObj.getDate() - daysSinceMonday);
 
@@ -146,19 +152,17 @@ exports.getDashboardStats = async (req, res) => {
 
     const weeklyMeals = await MealHistory.findAll({
       where: {
-        meal_date: {
-          [Op.between]: [mondayStr, sundayStr]
-        }
+        meal_date: { [Op.between]: [mondayStr, sundayStr] }
       }
     });
 
-    // Helper to aggregate item counts
+    // --- Helper: aggregate item stats ---
     const aggregateItems = (mealHistories) => {
       const mealStats = {};
 
       mealHistories.forEach(mh => {
-        const isServed = mh.is_valid ? 0 : 1;  // ✅ if scanned (is_valid=false) → served
-        const isRemaining = mh.is_valid ? 1 : 0; // ✅ remaining = not scanned yet
+        const isServed = mh.is_valid ? 0 : 1; // scanned → served
+        const isRemaining = mh.is_valid ? 1 : 0; // not scanned → remaining
 
         let items = [];
         try {
@@ -170,9 +174,7 @@ exports.getDashboardStats = async (req, res) => {
 
         items.forEach(item => {
           const name = item.name;
-          if (!mealStats[name]) {
-            mealStats[name] = { ordered: 0, served: 0, remaining: 0 };
-          }
+          if (!mealStats[name]) mealStats[name] = { ordered: 0, served: 0, remaining: 0 };
           mealStats[name].ordered += 1;
           mealStats[name].served += isServed;
           mealStats[name].remaining += isRemaining;
@@ -186,16 +188,15 @@ exports.getDashboardStats = async (req, res) => {
       return { total_orders, served, remaining, items: mealStats };
     };
 
+    // --- Build stats objects ---
     const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
     ['breakfast', 'lunch', 'dinner'].forEach(type => {
-      const filtered = dailyMeals.filter(m => m.meal_type === type);
-      dailyStats[type] = aggregateItems(filtered);
+      dailyStats[type] = aggregateItems(dailyMeals.filter(m => m.meal_type === type));
     });
 
     const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
     ['breakfast', 'lunch', 'dinner'].forEach(type => {
-      const filtered = weeklyMeals.filter(m => m.meal_type === type);
-      weeklyStats[type] = aggregateItems(filtered);
+      weeklyStats[type] = aggregateItems(weeklyMeals.filter(m => m.meal_type === type));
     });
 
     res.status(200).json({ dailyStats, weeklyStats });
