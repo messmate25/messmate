@@ -15,7 +15,7 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
       order_date: {
-        type: DataTypes.DATE,
+        type: DataTypes.DATEONLY,
         defaultValue: DataTypes.NOW,
       },
       status: {
@@ -23,13 +23,14 @@ module.exports = (sequelize) => {
         defaultValue: "ordered",
       },
       estimated_preparation_time: {
-        type: DataTypes.DATE,
+        type: DataTypes.TEXT,
         allowNull: true,
       },
+
     },
     {
       tableName: "guest_orders",
-      timestamps: true,
+      timestamps: false,
     }
   );
 
