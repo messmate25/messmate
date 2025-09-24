@@ -41,9 +41,9 @@
   (async () => {
     try {
 
-      const { sequelize  , User, Guest, MenuItem, WeeklyMenu, WeeklySelection, MealHistory} = await initModels();
+      const { sequelize  , User, Guest, MenuItem, WeeklyMenu, WeeklySelection, MealHistory, GuestOrder , GuestOrderItem} = await initModels();
 
-      app.locals.models = { User, Guest , MenuItem, WeeklyMenu, WeeklySelection, MealHistory};
+      app.locals.models = { User, Guest , MenuItem, WeeklyMenu, WeeklySelection, MealHistory , GuestOrder , GuestOrderItem};
 
       await sequelize.authenticate();
       console.log("✅ Database connected successfully.");
