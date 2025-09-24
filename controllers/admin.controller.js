@@ -126,11 +126,9 @@ exports.getDashboardStats = async (req, res) => {
       const mealStats = {};
 
       mealHistories.forEach(mh => {
-        // is_valid = false means meal is SERVED
-        // is_valid = true means meal is REMAINING (not served yet)
         const isServed = !mh.is_valid ? 1 : 0;
         const isRemaining = mh.is_valid ? 1 : 0;
-        
+
         let items = [];
         try {
           const qrData = JSON.parse(mh.qr_code_data);
@@ -145,12 +143,11 @@ exports.getDashboardStats = async (req, res) => {
             mealStats[name] = { ordered: 0, served: 0, remaining: 0 };
           }
           mealStats[name].ordered += 1;
-          mealStats[name].served += isServed;  // Count if served (is_valid = false)
-          mealStats[name].remaining += isRemaining;  // Count if remaining (is_valid = true)
+          mealStats[name].served += isServed;
+          mealStats[name].remaining += isRemaining;
         });
       });
 
-      // Calculate totals
       const total_orders = Object.values(mealStats).reduce((sum, i) => sum + i.ordered, 0);
       const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
       const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
@@ -159,13 +156,13 @@ exports.getDashboardStats = async (req, res) => {
     };
 
     // --- Daily stats ---
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
+    // Use DATEONLY-compatible comparison
+    const today = new Date().toISOString().split('T')[0]; // e.g., '2025-09-25'
 
     const dailyMeals = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [today, tomorrow] } }
+      where: {
+        meal_date: today
+      }
     });
 
     const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
@@ -175,11 +172,19 @@ exports.getDashboardStats = async (req, res) => {
     });
 
     // --- Weekly stats (last 7 days including today) ---
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - 6);
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - 6);
+    const weekStartStr = weekStart.toISOString().split('T')[0]; // e.g., '2025-09-19'
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]; // e.g., '2025-09-26'
 
     const weeklyMeals = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [weekStart, tomorrow] } } // Include today
+      where: {
+        meal_date: {
+          [Op.between]: [weekStartStr, tomorrowStr]
+        }
+      }
     });
 
     const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
