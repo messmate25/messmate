@@ -115,51 +115,98 @@ exports.deleteWeeklyMenu = async (req, res) => {
 };
 
 // --- Dashboard ---
+// --- Dashboard ---
 exports.getDashboardStats = async (req, res) => {
   try {
-    const { MealHistory, weeklySelection } = getModels(req);
+    const { MealHistory, WeeklySelection, MenuItem } = getModels(req);
     const { Op } = require("sequelize");
 
-    // Helper to aggregate item counts
-    const aggregateItems = (mealHistories) => {
+    // Helper to aggregate item counts from Weekly Selections
+    const aggregateItems = async (mealHistories, dateRange) => {
       const mealStats = {};
-
-      mealHistories.forEach((mh) => {
-        const isValid = mh.is_valid ? 1 : 0;
-        let items = [];
-        try {
-          const qrData = JSON.parse(mh.qr_code_data);
-          items = qrData.items || [];
-        } catch (err) {
-          console.warn("Invalid QR data for meal_history id:", mh.id);
-        }
-
-        items.forEach((item) => {
-          const name = item.name;
-          if (!mealStats[name]) {
-            mealStats[name] = { ordered: 0, served: 0, remaining: 0 };
-          }
-          mealStats[name].ordered += 1;
-          mealStats[name].remaining += isValid;
-          mealStats[name].served += 1 - isValid;
-        });
+      const dayWiseStats = {};
+      
+      // Get all weekly selections for the date range
+      const weeklySelections = await WeeklySelection.findAll({
+        where: { 
+          meal_date: { 
+            [Op.between]: [dateRange.start, dateRange.end] 
+          } 
+        },
+        include: [{
+          model: MenuItem,
+          attributes: ['id', 'name']
+        }]
       });
 
-      // Calculate totals
-      const total_orders = Object.values(mealStats).reduce(
-        (sum, i) => sum + i.ordered,
-        0
-      );
-      const served = Object.values(mealStats).reduce(
-        (sum, i) => sum + i.served,
-        0
-      );
-      const remaining = Object.values(mealStats).reduce(
-        (sum, i) => sum + i.remaining,
-        0
-      );
+      // Create a map of meal_date + meal_type to menu item
+      const selectionMap = {};
+      weeklySelections.forEach(ws => {
+        const key = `${ws.meal_date}-${ws.meal_type}`;
+        selectionMap[key] = {
+          menu_item_id: ws.MenuItem.id,
+          item_name: ws.MenuItem.name
+        };
+        
+        // Initialize day-wise stats
+        const mealDate = new Date(ws.meal_date).toISOString().split('T')[0];
+        if (!dayWiseStats[mealDate]) {
+          dayWiseStats[mealDate] = {
+            breakfast: { item_name: '', ordered: 0, served: 0, remaining: 0 },
+            lunch: { item_name: '', ordered: 0, served: 0, remaining: 0 },
+            dinner: { item_name: '', ordered: 0, served: 0, remaining: 0 }
+          };
+        }
+        
+        // Set the item name for each meal type on that day
+        dayWiseStats[mealDate][ws.meal_type].item_name = ws.MenuItem.name;
+      });
 
-      return { total_orders, served, remaining, items: mealStats };
+      // Count orders and served meals
+      mealHistories.forEach(mh => {
+        const key = `${mh.meal_date}-${mh.meal_type}`;
+        const selection = selectionMap[key];
+        
+        if (selection) {
+          const itemName = selection.item_name;
+          const mealDate = new Date(mh.meal_date).toISOString().split('T')[0];
+          
+          // Overall stats by item
+          if (!mealStats[itemName]) {
+            mealStats[itemName] = { ordered: 0, served: 0, remaining: 0 };
+          }
+          
+          mealStats[itemName].ordered += 1;
+          if (!mh.is_valid) {
+            mealStats[itemName].served += 1;
+          } else {
+            mealStats[itemName].remaining += 1;
+          }
+          
+          // Day-wise stats
+          if (dayWiseStats[mealDate] && dayWiseStats[mealDate][mh.meal_type]) {
+            dayWiseStats[mealDate][mh.meal_type].ordered += 1;
+            if (!mh.is_valid) {
+              dayWiseStats[mealDate][mh.meal_type].served += 1;
+            } else {
+              dayWiseStats[mealDate][mh.meal_type].remaining += 1;
+            }
+          }
+        }
+      });
+
+      // Calculate totals for overall stats
+      const total_orders = Object.values(mealStats).reduce((sum, i) => sum + i.ordered, 0);
+      const served = Object.values(mealStats).reduce((sum, i) => sum + i.served, 0);
+      const remaining = Object.values(mealStats).reduce((sum, i) => sum + i.remaining, 0);
+
+      return { 
+        total_orders, 
+        served, 
+        remaining, 
+        items: mealStats,
+        day_wise: dayWiseStats 
+      };
     };
 
     // --- Daily stats ---
@@ -169,83 +216,45 @@ exports.getDashboardStats = async (req, res) => {
     tomorrow.setDate(today.getDate() + 1);
 
     const dailyMeals = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [today, tomorrow] } },
+      where: { meal_date: { [Op.between]: [today, tomorrow] } }
     });
 
     const dailyStats = { breakfast: {}, lunch: {}, dinner: {} };
-    ["breakfast", "lunch", "dinner"].forEach((type) => {
-      const filtered = dailyMeals.filter((m) => m.meal_type === type);
-      dailyStats[type] = aggregateItems(filtered);
-    });
+    for (const type of ['breakfast', 'lunch', 'dinner']) {
+      const filtered = dailyMeals.filter(m => m.meal_type === type);
+      dailyStats[type] = await aggregateItems(filtered, {
+        start: today,
+        end: tomorrow
+      });
+    }
 
     // --- Weekly stats (last 7 days including today) ---
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
 
     const weeklyMeals = await MealHistory.findAll({
-      where: { meal_date: { [Op.between]: [weekStart, tomorrow] } },
+      where: { meal_date: { [Op.between]: [weekStart, today] } }
     });
 
     const weeklyStats = { breakfast: {}, lunch: {}, dinner: {} };
-    ["breakfast", "lunch", "dinner"].forEach((type) => {
-      const filtered = weeklyMeals.filter((m) => m.meal_type === type);
-      weeklyStats[type] = aggregateItems(filtered);
-    });
-
-    // --- Weekly selection stats with day-wise breakdown ---
-    const weeklySelections = await weeklySelection.findAll({
-      where: { meal_date: { [Op.between]: [weekStart, tomorrow] } },
-    });
-
-    const weeklySelectionStats = [];
-
-    // Create a date-wise map
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
-      const dateString = date.toISOString().split("T")[0]; // YYYY-MM-DD
-
-      const daySelections = weeklySelections.filter(
-        (ws) => ws.meal_date === dateString
-      );
-      const dayMeals = weeklyMeals.filter(
-        (mh) => mh.meal_date.toISOString().split("T")[0] === dateString
-      );
-
-      const dayStat = { date: dateString, meals: {} };
-
-      for (const type of ["breakfast", "lunch", "dinner"]) {
-        const selectionsForType = daySelections.filter(
-          (ws) => ws.meal_type === type
-        );
-        const servedForType = dayMeals.filter(
-          (mh) => mh.meal_type === type && !mh.is_valid
-        );
-
-        dayStat.meals[type] = {
-          total_selected: selectionsForType.length,
-          total_served: servedForType.length,
-          remaining: selectionsForType.length - servedForType.length,
-        };
-      }
-
-      weeklySelectionStats.push(dayStat);
+    for (const type of ['breakfast', 'lunch', 'dinner']) {
+      const filtered = weeklyMeals.filter(m => m.meal_type === type);
+      weeklyStats[type] = await aggregateItems(filtered, {
+        start: weekStart,
+        end: today
+      });
     }
 
-    res.status(200).json({
-      dailyStats,
-      weeklyStats,
-      weeklySelectionStats, // ✅ now contains per-day breakdown
+    res.status(200).json({ 
+      dailyStats, 
+      weeklyStats 
     });
   } catch (error) {
     console.error("Dashboard Stats Error:", error);
-    res
-      .status(500)
-      .json({ message: "Something went wrong.", error: error.message });
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
-
-
 
 
 // --- Add Menu Item with Image Upload ---
@@ -615,7 +624,8 @@ exports.getAllGuestsWithOrders = async (req, res) => {
 exports.updateGuestOrderStatus = async (req, res) => {
   try {
     const { GuestOrder } = getModels(req);
-    const { orderId , status } = req.body;
+    const { orderId } = req.params;
+    const { status } = req.body;
 
     if (!status || !["ordered", "preparing", "prepared", "served"].includes(status)) {
       return res.status(400).json({ message: "Invalid status value." });
