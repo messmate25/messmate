@@ -169,6 +169,10 @@ exports.getDashboardStats = async (req, res) => {
       dailyStats[type] = aggregateItems(filtered);
     });
 
+
+
+    
+
     // --- Weekly stats (last 7 days including today) ---
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - 6);
