@@ -55,13 +55,43 @@ exports.getWeeklyMenu = async (req, res) => {
       return res.status(404).json({ message: `No menu found for the week starting ${week_start_date}.` });
     }
 
+    // ✅ Get current date (without time for proper comparison)
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+    
+    // ✅ Calculate the date for each day of the week
+    const weekStart = new Date(week_start_date);
+    const dayDateMap = {};
+    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    
+    // Map each day_of_week to its actual date
+    daysOfWeek.forEach((day, index) => {
+      const dayDate = new Date(weekStart);
+      dayDate.setDate(weekStart.getDate() + index);
+      dayDateMap[day] = dayDate;
+    });
+
     const groupedMenu = {};
     for (const item of menu) {
       const day = item.day_of_week;
       const meal = item.meal_type;
+      
+      // ✅ Check if this day's date is in the past
+      const dayDate = dayDateMap[day.toLowerCase()];
+      if (dayDate && dayDate < currentDate) {
+        continue; // Skip past days
+      }
+      
       if (!groupedMenu[day]) groupedMenu[day] = {};
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
       groupedMenu[day][meal].push(item.MenuItem);
+    }
+
+    // ✅ If all days are filtered out (all in past), return appropriate message
+    if (Object.keys(groupedMenu).length === 0) {
+      return res.status(404).json({ 
+        message: `No upcoming days found in the menu for the week starting ${week_start_date}.` 
+      });
     }
 
     res.status(200).json(groupedMenu);
@@ -96,29 +126,86 @@ exports.submitWeeklySelection = async (req, res) => {
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
 
-    await WeeklySelection.destroy({
-      where: { userId, meal_date: { [Op.between]: [startDate, endDate] } }
+    // ✅ Get existing selections to compare and calculate charges properly
+    const existingSelections = await WeeklySelection.findAll({
+      where: { userId, meal_date: { [Op.between]: [startDate, endDate] } },
+      include: [{ model: MenuItem }]
     });
 
-    const newSelections = selections.map(selection => ({
-      ...selection,
-      userId,
-      is_default: false
-    }));
+    // ✅ Create a map of existing selections for quick lookup
+    const existingSelectionMap = new Map();
+    existingSelections.forEach(selection => {
+      const key = `${selection.meal_date}-${selection.meal_type}`;
+      existingSelectionMap.set(key, selection);
+    });
 
-    await WeeklySelection.bulkCreate(newSelections);
+    // ✅ Prepare operations: create new or update existing
+    const operations = [];
+    const newSelections = [];
 
-    // ✅ Check extra charges
-    let totalExtraCharge = 0;
-    for (const s of selections) {
-      const menuItem = await MenuItem.findByPk(s.menuItemId);
-      if (menuItem && menuItem.extra_price) {
-        totalExtraCharge += parseFloat(menuItem.extra_price);
+    for (const selection of selections) {
+      const key = `${selection.meal_date}-${selection.meal_type}`;
+      const existingSelection = existingSelectionMap.get(key);
+
+      if (existingSelection) {
+        // ✅ Update existing selection if menuItemId changed
+        if (existingSelection.menuItemId !== selection.menuItemId) {
+          operations.push(
+            WeeklySelection.update(
+              { menuItemId: selection.menuItemId },
+              { where: { id: existingSelection.id } }
+            )
+          );
+        }
+        // Remove from map to track what remains (needs to be deleted)
+        existingSelectionMap.delete(key);
+      } else {
+        // ✅ Create new selection
+        newSelections.push({
+          ...selection,
+          userId,
+          is_default: false
+        });
       }
     }
 
+    // ✅ Delete selections that are no longer in the new submission
+    const selectionsToDelete = Array.from(existingSelectionMap.values());
+    if (selectionsToDelete.length > 0) {
+      operations.push(
+        WeeklySelection.destroy({
+          where: { 
+            id: selectionsToDelete.map(s => s.id) 
+          }
+        })
+      );
+    }
+
+    // ✅ Create new selections if any
+    if (newSelections.length > 0) {
+      operations.push(WeeklySelection.bulkCreate(newSelections));
+    }
+
+    // ✅ Execute all database operations
+    await Promise.all(operations);
+
+    // ✅ Calculate extra charges only for NEW selections and UPDATED selections
+    let totalExtraCharge = 0;
+    const processedMenuItems = new Set();
+
+    for (const s of selections) {
+      // Only process each menu item once to avoid double counting
+      if (!processedMenuItems.has(s.menuItemId)) {
+        const menuItem = await MenuItem.findByPk(s.menuItemId);
+        if (menuItem && menuItem.extra_price) {
+          totalExtraCharge += parseFloat(menuItem.extra_price);
+          processedMenuItems.add(s.menuItemId);
+        }
+      }
+    }
+
+    // ✅ Only charge for net new extra charges
     if (totalExtraCharge > 0) {
-      // ✅ Check user balance
       const user = await User.findByPk(userId);
       if (!user) {
         return res.status(404).json({ message: 'User not found.' });
@@ -134,13 +221,21 @@ exports.submitWeeklySelection = async (req, res) => {
       user.wallet_balance = parseFloat(user.wallet_balance) - totalExtraCharge;
       await user.save();
 
-      // ✅ Log in MealHistory
-
+      // ✅ Log transaction (you should implement this)
+      // await Transaction.create({
+      //   userId,
+      //   amount: -totalExtraCharge,
+      //   type: 'weekly_selection_extra_charge',
+      //   description: `Extra charges for weekly selections`
+      // });
     }
 
     res.status(201).json({
-      message: 'Your weekly menu has been saved successfully!',
-      total_extra_charge: totalExtraCharge
+      message: 'Your weekly menu has been updated successfully!',
+      total_extra_charge: totalExtraCharge,
+      added: newSelections.length,
+      updated: selections.length - newSelections.length - selectionsToDelete.length,
+      removed: selectionsToDelete.length
     });
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
@@ -161,13 +256,24 @@ exports.generateMealQR = async (req, res) => {
     // Check if QR already exists for this user, meal_date, and meal_type
     const existingQR = await MealHistory.findOne({
       where: { userId, meal_date, meal_type }
-    });
+    }); 
 
     if (existingQR) {
-      return res.status(409).json({
-        message: `QR already generated for ${meal_type} on ${meal_date}.`,
+      // ✅ If QR exists but is invalid (already scanned), don't allow regeneration
+      if (!existingQR.is_valid) {
+        return res.status(409).json({
+          message: `QR code for ${meal_type} on ${meal_date} has already been scanned and cannot be regenerated.`,
+          scanned: true,
+          scanned_at: existingQR.scanned_at // assuming you have this field
+        });
+      }
+      
+      // ✅ If QR exists and is still valid, return the existing QR data
+      return res.status(200).json({
+        message: `QR code for ${meal_type} on ${meal_date} is still valid.`,
         qr_code_payload: JSON.parse(existingQR.qr_code_data),
-        meal_history_id: existingQR.id
+        meal_history_id: existingQR.id,
+        is_valid: existingQR.is_valid
       });
     }
 
@@ -213,7 +319,8 @@ exports.generateMealQR = async (req, res) => {
     return res.status(200).json({
       message: "QR generated successfully.",
       qr_code_payload: qrPayload,
-      meal_history_id: mealHistory.id, // helps track this QR later
+      meal_history_id: mealHistory.id,
+      is_valid: true
     });
   } catch (error) {
     console.error("generateMealQR error:", error);
