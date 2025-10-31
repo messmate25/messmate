@@ -16,4 +16,7 @@ router.post('/login', authController.login);
 router.post('/guest/signup', authController.guestSignup);
 router.post('/guest/verify', authController.guestVerifyOTP);
 
+// --- Password Routes ---
+router.post('/update-password', authController.updatePassword);
+
 module.exports = router;

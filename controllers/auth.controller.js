@@ -72,6 +72,28 @@ exports.login = async (req, res) => {
   }
 };
 
+// --- Update Password ---
+exports.updatePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const { User } = getModels(req);
+    const userId = req.user.id; // from auth middleware
+
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const isPasswordCorrect = await bcrypt.compare(oldPassword, user.password);
+    if (!isPasswordCorrect)
+      return res.status(400).json({ message: "Old password is incorrect." });
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    await user.update({ password: hashedNewPassword });
+
+    res.status(200).json({ message: "Password updated successfully." });
+  } catch (error) {
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
+  }
+};
 
 // --- Guest Signup (Request OTP) ---
 exports.guestSignup = async (req, res) => {
