@@ -55,7 +55,6 @@ exports.placeOrder = async (req, res) => {
     const { Guest, MenuItem, GuestOrder, GuestOrderItem } = getModels(req);
     const guestId = req.user.id;
     const { items } = req.body;
-    // Expected: items = [{ menuItemId: 1, quantity: 2 }, { menuItemId: 3, quantity: 1 }]
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "At least one menu item is required." });
@@ -66,7 +65,7 @@ exports.placeOrder = async (req, res) => {
       return res.status(404).json({ message: "Guest profile not found." });
     }
 
-    // ✅ Validate Menu Items
+    // Validate Menu Items
     const menuItemIds = items.map((i) => i.menuItemId);
     const menuItems = await MenuItem.findAll({ where: { id: menuItemIds } });
 
@@ -74,19 +73,31 @@ exports.placeOrder = async (req, res) => {
       return res.status(400).json({ message: "One or more selected menu items are invalid." });
     }
 
-    // ✅ Get Estimated Prep Time Text (from MenuItem)
-    // If multiple items, we can join their prep times as text
+    // Calculate total amount
+    let totalAmount = 0;
+    const priceMap = {};
+    menuItems.forEach(item => {
+      priceMap[item.id] = parseFloat(item.extra_price);
+    });
+    
+    items.forEach(item => {
+      const price = priceMap[item.menuItemId] || 0;
+      totalAmount += price * (item.quantity || 1);
+    });
+
+    // Get Estimated Prep Time Text
     const estimatedPrepText = menuItems.map((m) => m.estimated_prep_time).join(", ");
 
-    // ✅ Create Guest Order
+    // Create Guest Order with pending_payment status
     const order = await GuestOrder.create({
       guestId,
       order_date: new Date(),
-      status: "ordered",
-      estimated_preparation_time: estimatedPrepText, // storing text directly
+      status: "pending_payment",
+      estimated_preparation_time: estimatedPrepText,
+      amount: totalAmount
     });
 
-    // ✅ Create Order Items
+    // Create Order Items
     const orderItems = items.map((i) => ({
       orderId: order.id,
       menu_item_id: i.menuItemId,
@@ -96,14 +107,14 @@ exports.placeOrder = async (req, res) => {
     await GuestOrderItem.bulkCreate(orderItems);
 
     res.status(201).json({
-      message: "Order placed successfully!",
+      message: "Order created successfully. Proceed to payment.",
       orderId: order.id,
-      status: order.status,
-      estimated_preparation_time: estimatedPrepText,
+      amount: totalAmount,
       items: orderItems,
+      nextStep: "payment"
     });
   } catch (error) {
-    console.error("Error placing guest order:", error);
+    console.error("Error creating guest order:", error);
     res.status(500).json({ message: "Something went wrong.", error: error.message });
   }
 };

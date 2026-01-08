@@ -56,5 +56,5 @@ router.get("/users/:userId", protectedAdminRoute, adminController.getUserById);
 router.delete("/users/:userId", protectedAdminRoute, adminController.deleteUser);
 router.post('/recharge', protectedAdminRoute, adminController.updateWalletBalance);
 router.get("/fetchGuestOrders", protectedAdminRoute, adminController.getAllGuestsWithOrders); 
-router.post("/updateOrderStatus", protectedAdminRoute, adminController.updateGuestOrderStatus);
+router.post("/updateOrderStatus/:orderId", protectedAdminRoute, adminController.updateOrderStatus);
 module.exports = router;

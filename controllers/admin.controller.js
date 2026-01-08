@@ -9,7 +9,7 @@ const getModels = (req) => req.app.locals.models;
 
 const { BlobServiceClient } = require("@azure/storage-blob");
 
-const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
+const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING || "DefaultEndpointsProtocol=https;AccountName=messmate;AccountKey=HzcfkUnCoacrEuYjaMEVZbGNTus7v7U12B+dG+k1Ml0Wd1rDaqTQTf8jS3xRD9NH3Uy4467LYG6N+AStcBV9kw==;EndpointSuffix=core.windows.net";
 const CONTAINER_NAME = "image";
 
 const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
@@ -214,7 +214,7 @@ exports.getDashboardStats = async (req, res) => {
 exports.addMenuItem = async (req, res) => {
   try {
     const { MenuItem } = getModels(req);
-    const { name, estimated_prep_time, monthly_limit, extra_price, description } = req.body;
+    const { name, estimated_prep_time, monthly_limit, weekly_limit, extra_price, description } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ message: "Image file is required." });
@@ -235,6 +235,7 @@ exports.addMenuItem = async (req, res) => {
       name,
       estimated_prep_time,
       monthly_limit,
+      weekly_limit,
       extra_price,
       description,
       image_url: imageUrl,
@@ -454,6 +455,7 @@ exports.getMenuItems = async (req, res) => {
         'image_url',
         'estimated_prep_time',
         'monthly_limit',
+        'weekly_limit',
         'extra_price'
       ],
       order: [['name', 'ASC']] // Optional: sort alphabetically
@@ -472,7 +474,7 @@ exports.updateMenuItem = async (req, res) => {
   try {
     const { MenuItem } = getModels(req);
     const { id } = req.params;
-    const { name, description, estimated_prep_time, monthly_limit, extra_price } = req.body;
+    const { name, description, estimated_prep_time, monthly_limit, weekly_limit, extra_price } = req.body;
 
     const item = await MenuItem.findByPk(id);
     if (!item) {
@@ -497,6 +499,7 @@ exports.updateMenuItem = async (req, res) => {
       description,
       estimated_prep_time,
       monthly_limit,
+      weekly_limit,
       extra_price,
       image_url: imageUrl
     });
@@ -574,13 +577,18 @@ exports.getAllGuestsWithOrders = async (req, res) => {
 
 // controllers/order.controller.js
 
-exports.updateGuestOrderStatus = async (req, res) => {
+exports.updateOrderStatus = async (req, res) => {
   try {
     const { GuestOrder } = getModels(req);
-    const { orderId , status } = req.body;
+    const { orderId } = req.params;
+    const { status } = req.body;
 
-    if (!status || !["ordered", "preparing", "prepared", "served"].includes(status)) {
-      return res.status(400).json({ message: "Invalid status value." });
+    const validStatuses = ["confirmed", "preparing", "on_the_way", "delivered", "cancelled"];
+    
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+      });
     }
 
     const order = await GuestOrder.findByPk(orderId);
@@ -588,8 +596,14 @@ exports.updateGuestOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found." });
     }
 
-    order.status = status;
-    await order.save();
+    // Check if order is paid (except for cancellation)
+    if (status !== "cancelled" && order.payment_status !== "captured") {
+      return res.status(400).json({ 
+        message: "Cannot update status for unpaid orders." 
+      });
+    }
+
+    await order.update({ status });
 
     res.status(200).json({
       message: "Order status updated successfully.",

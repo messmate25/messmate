@@ -38,6 +38,11 @@ module.exports = (sequelize) => {
       allowNull: false,
       comment: 'Default free usage limit per month for students'
     },
+    weekly_limit: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment: 'Default free usage limit per week for students'
+    },
     extra_price: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
