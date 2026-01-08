@@ -14,7 +14,7 @@
       "description": "Development server"
     },
     {
-      "url": "https://your-production-url.com/api",
+      "url": "https://messapp-dkfffueseegwexf9.centralindia-01.azurewebsites.net",
       "description": "Production server"
     }
   ],

@@ -9,7 +9,7 @@ const getModels = (req) => req.app.locals.models;
 
 const { BlobServiceClient } = require("@azure/storage-blob");
 
-const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING || "DefaultEndpointsProtocol=https;AccountName=messmate;AccountKey=HzcfkUnCoacrEuYjaMEVZbGNTus7v7U12B+dG+k1Ml0Wd1rDaqTQTf8jS3xRD9NH3Uy4467LYG6N+AStcBV9kw==;EndpointSuffix=core.windows.net";
+const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING ;
 const CONTAINER_NAME = "image";
 
 const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
