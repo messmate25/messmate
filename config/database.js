@@ -1,44 +1,43 @@
-// config/database.js - Alternative approach
+// File: config/database.js
+
 const { Sequelize } = require("sequelize");
 const { DefaultAzureCredential } = require("@azure/identity");
 const tedious = require("tedious");
 const { DB_NAME, DB_HOST, AZURE_SQL_SCOPE } = require("./constants");
 
 async function createSequelize() {
-  // Get token first
-  const credential = new DefaultAzureCredential();
-  const tokenResponse = await credential.getToken(AZURE_SQL_SCOPE);
-  
-  const sequelize = new Sequelize(DB_NAME, null, null, {
-    dialect: "mssql",
-    host: DB_HOST,
-    dialectModule: tedious,
-    logging: console.log, // Enable for debugging
-    dialectOptions: {
-      authentication: {
-        type: "azure-active-directory-access-token",
-        options: {
-          token: tokenResponse.token
-        }
-      },
-      options: {
-        encrypt: true,
-        trustServerCertificate: false,
-        connectTimeout: 60000,
-        requestTimeout: 60000,
-        cryptoCredentialsDetails: {
-          minVersion: 'TLSv1.2'
-        }
-      }
-    },
-    pool: {
-      max: 5,
-      min: 0,
-      idle: 30000,
-      acquire: 60000,
-      evict: 1000
-    }
-  });
+  try {
+    // Authenticate with Azure Identity
+    const credential = new DefaultAzureCredential();
 
-  return sequelize;
+    // Get AAD access token for Azure SQL
+    const accessTokenResponse = await credential.getToken(AZURE_SQL_SCOPE);
+    const accessToken = accessTokenResponse.token;
+
+    // Create Sequelize instance with tedious (MSSQL)
+    const sequelize = new Sequelize(DB_NAME, null, null, {
+      dialect: "mssql",
+      host: DB_HOST,
+      dialectModule: tedious,
+      dialectOptions: {
+        authentication: {
+          type: "azure-active-directory-access-token",
+          options: {
+            token: accessToken,
+          },
+        },
+        options: {
+          encrypt: true, // Required for Azure SQL
+        },
+      },
+      logging: true, // Disable logging; set true for debugging
+    });
+
+    return sequelize;
+  } catch (error) {
+    console.error("❌ Error creating Sequelize instance:", error);
+    throw error;
+  }
 }
+
+module.exports = createSequelize;
