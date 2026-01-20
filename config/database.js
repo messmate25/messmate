@@ -1,43 +1,42 @@
-// File: config/database.js
-
+// config/database.js
 const { Sequelize } = require("sequelize");
 const { DefaultAzureCredential } = require("@azure/identity");
 const tedious = require("tedious");
 const { DB_NAME, DB_HOST, AZURE_SQL_SCOPE } = require("./constants");
 
-async function createSequelize() {
-  try {
-    // Authenticate with Azure Identity
-    const credential = new DefaultAzureCredential();
+const credential = new DefaultAzureCredential();
 
-    // Get AAD access token for Azure SQL
-    const accessTokenResponse = await credential.getToken(AZURE_SQL_SCOPE);
-    const accessToken = accessTokenResponse.token;
+const sequelize = new Sequelize(DB_NAME, null, null, {
+  dialect: "mssql",
+  host: DB_HOST,
+  dialectModule: tedious,
+  logging: false,
 
-    // Create Sequelize instance with tedious (MSSQL)
-    const sequelize = new Sequelize(DB_NAME, null, null, {
-      dialect: "mssql",
-      host: DB_HOST,
-      dialectModule: tedious,
-      dialectOptions: {
-        authentication: {
-          type: "azure-active-directory-access-token",
-          options: {
-            token: accessToken,
-          },
-        },
+  dialectOptions: {
+    options: {
+      encrypt: true,
+    },
+  },
+
+  pool: {
+    max: 5,
+    min: 0,
+    idle: 10000,
+    acquire: 30000,
+  },
+
+  hooks: {
+    beforeConnect: async (config) => {
+      const token = await credential.getToken(AZURE_SQL_SCOPE);
+
+      config.authentication = {
+        type: "azure-active-directory-access-token",
         options: {
-          encrypt: true, // Required for Azure SQL
+          token: token.token,
         },
-      },
-      logging: true, // Disable logging; set true for debugging
-    });
+      };
+    },
+  },
+});
 
-    return sequelize;
-  } catch (error) {
-    console.error("❌ Error creating Sequelize instance:", error);
-    throw error;
-  }
-}
-
-module.exports = createSequelize;
+module.exports = sequelize;
