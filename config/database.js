@@ -6,7 +6,7 @@ const { DB_NAME, DB_HOST, AZURE_SQL_SCOPE } = require("./constants");
 
 const credential = new DefaultAzureCredential();
 
-const sequelize = new Sequelize(DB_NAME, null, null, {
+const createSequelize  = new Sequelize(DB_NAME, null, null, {
   dialect: "mssql",
   host: DB_HOST,
   dialectModule: tedious,
@@ -39,4 +39,4 @@ const sequelize = new Sequelize(DB_NAME, null, null, {
   },
 });
 
-module.exports = sequelize;
+module.exports = createSequelize ;
