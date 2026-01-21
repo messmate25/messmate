@@ -57,8 +57,6 @@ module.exports = (sequelize) => {
     {
       tableName: "guest_orders",
       timestamps: true, // Enable timestamps for created_at and updated_at
-      createdAt: 'order_date_time', // Rename created_at
-      updatedAt: 'updated_at'
     }
   );
 

@@ -479,7 +479,7 @@ exports.previewWeeklySelection = async (req, res) => {
 
       const currentSimulatedUsage = simulatedUsage[selection.menuItemId] || 0;
 
-      if (currentSimulatedUsage >= menuItem.monthly_limit || currentSimulatedUsage >= menuItem.weekly_limits) {
+      if (currentSimulatedUsage >= menuItem.monthly_limit || currentSimulatedUsage >= menuItem.weekly_limit) {
         totalExtraCost += parseFloat(menuItem.extra_price);
         chargedItems.push({
           name: menuItem.name,
