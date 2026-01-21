@@ -52,14 +52,8 @@ exports.createRazorpayOrder = async (req, res) => {
     };
 
     const razorpayOrder = await razorpay.orders.create(options);
+    console.log("Razorpay Order Created:", razorpayOrder); 
 
-    // Store order details in session or temporary storage
-    req.session.tempOrder = {
-      guestId,
-      items,
-      totalAmount,
-      razorpayOrderId: razorpayOrder.id
-    };
 
     res.status(200).json({
       success: true,
@@ -169,10 +163,6 @@ exports.verifyPayment = async (req, res) => {
       await GuestOrderItem.bulkCreate(orderItems);
     }
 
-    // Clear temporary order from session
-    if (req.session.tempOrder) {
-      delete req.session.tempOrder;
-    }
 
     res.status(201).json({
       success: true,
