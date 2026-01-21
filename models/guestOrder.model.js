@@ -29,6 +29,10 @@ module.exports = (sequelize) => {
         ),
         defaultValue: "pending_payment",
       },
+      type: {
+        type: DataTypes.ENUM("dine_in", "parcel"),
+        allowNull: false,
+      },
       estimated_preparation_time: {
         type: DataTypes.TEXT,
         allowNull: true,

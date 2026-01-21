@@ -55,6 +55,7 @@ exports.placeOrder = async (req, res) => {
     const { Guest, MenuItem, GuestOrder, GuestOrderItem } = getModels(req);
     const guestId = req.user.id;
     const { items } = req.body;
+    const { type } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "At least one menu item is required." });
@@ -93,6 +94,7 @@ exports.placeOrder = async (req, res) => {
       guestId,
       order_date: new Date(),
       status: "pending_payment",
+      type: type,
       estimated_preparation_time: estimatedPrepText,
       amount: totalAmount
     });
