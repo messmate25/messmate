@@ -1,5 +1,3 @@
-// File: models/user.model.js
-
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
@@ -24,14 +22,14 @@ module.exports = (sequelize) => {
     },
     password: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: true // Allow null for guests who only use OTP
     },
     room_no: {
       type: DataTypes.STRING,
       allowNull: true
     },
     role: {
-      type: DataTypes.ENUM('student', 'admin', 'super_admin'),
+      type: DataTypes.ENUM('student', 'admin', 'super_admin', 'guest'),
       allowNull: false,
       defaultValue: 'student'
     },
