@@ -83,16 +83,16 @@ exports.verifyPayment = async (req, res) => {
       razorpay_payment_id, 
       razorpay_order_id, 
       razorpay_signature,
-      items 
+      orderId  // Add this to receive the pending order ID
     } = req.body;
 
     const guestId = req.user.id;
 
     // Validate required fields
-    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !orderId) {
       return res.status(400).json({ 
         success: false, 
-        message: "Missing payment details" 
+        message: "Missing required details (payment info or orderId)" 
       });
     }
 
@@ -111,67 +111,55 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // Calculate total amount and get estimated prep time
-    let totalAmount = 0;
-    let estimatedPrepText = "";
-    
-    if (items && items.length > 0) {
-      const menuItemIds = items.map(i => i.menuItemId);
-      const menuItems = await MenuItem.findAll({
-        where: { id: menuItemIds }
-      });
+    // Find the existing pending order
+    const existingOrder = await GuestOrder.findOne({
+      where: { 
+        id: orderId,
+        guestId: guestId,
+        status: "pending_payment"
+      },
+      include: [{
+        model: GuestOrderItem,
+        as: "items"
+      }]
+    });
 
-      const priceMap = {};
-      const prepTimeMap = {};
-      menuItems.forEach(item => {
-        priceMap[item.id] = parseFloat(item.extra_price);
-        prepTimeMap[item.id] = item.estimated_prep_time;
-      });
-
-      // Calculate total and prep time
-      items.forEach(item => {
-        const price = priceMap[item.menuItemId] || 0;
-        totalAmount += price * (item.quantity || 1);
-        
-        const prepTime = prepTimeMap[item.menuItemId];
-        if (prepTime && !estimatedPrepText.includes(prepTime)) {
-          if (estimatedPrepText) estimatedPrepText += ", ";
-          estimatedPrepText += prepTime;
-        }
+    if (!existingOrder) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Pending order not found or already processed" 
       });
     }
 
-    // Create Guest Order with payment details
-    const order = await GuestOrder.create({
-      guestId,
-      order_date: new Date(),
-      status: "confirmed", // Payment successful, move to confirmed
+    // Get estimated prep time from existing items if not already set
+    let estimatedPrepText = existingOrder.estimated_preparation_time;
+    
+    if (!estimatedPrepText || estimatedPrepText === "") {
+      const itemIds = existingOrder.items.map(item => item.menu_item_id);
+      const menuItems = await MenuItem.findAll({
+        where: { id: itemIds }
+      });
+      
+      estimatedPrepText = menuItems.map(item => item.estimated_prep_time).filter(Boolean).join(", ");
+    }
+
+    // Update the existing order with payment details
+    await existingOrder.update({
+      status: "confirmed",
       estimated_preparation_time: estimatedPrepText,
       payment_id: razorpay_payment_id,
       order_id: razorpay_order_id,
-      amount: totalAmount,
       payment_status: "captured"
     });
 
-    // Create Order Items
-    if (items && items.length > 0) {
-      const orderItems = items.map(item => ({
-        orderId: order.id,
-        menu_item_id: item.menuItemId,
-        quantity: item.quantity || 1,
-      }));
-      await GuestOrderItem.bulkCreate(orderItems);
-    }
-
-
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      message: "Order placed and payment successful!",
-      orderId: order.id,
+      message: "Payment successful and order confirmed!",
+      orderId: existingOrder.id,
       paymentId: razorpay_payment_id,
-      status: order.status,
+      status: "confirmed",
       estimated_preparation_time: estimatedPrepText,
-      amount: totalAmount
+      amount: existingOrder.amount
     });
 
   } catch (error) {
@@ -183,7 +171,6 @@ exports.verifyPayment = async (req, res) => {
     });
   }
 };
-
 // Webhook for payment status updates (optional but recommended)
 exports.paymentWebhook = async (req, res) => {
   try {
