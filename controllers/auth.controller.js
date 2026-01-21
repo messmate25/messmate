@@ -1,13 +1,18 @@
+// File: controllers/auth.controller.js
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+// const emailjs = require('@emailjs/nodejs');
+const emailjs = require("emailjs-com");
 const nodemailer = require("nodemailer");
+
 
 /**
  * Helper to get initialized models from request
  */
 const getModels = (req) => req.app.locals.models;
 
-// --- User Registration (Regular with Password) ---
+// --- User Registration ---
 exports.register = async (req, res) => {
   try {
     const { name, email, password, room_no, role } = req.body;
@@ -38,7 +43,7 @@ exports.register = async (req, res) => {
   }
 };
 
-// --- User Login (Password-based) ---
+// --- User Login ---
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -47,13 +52,6 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(404).json({ message: 'User not found.' });
-    }
-
-    // Check if user has password (regular user)
-    if (!user.password) {
-      return res.status(400).json({ 
-        message: 'This account uses OTP login. Please use guest verification.' 
-      });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
@@ -67,62 +65,74 @@ exports.login = async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    res.status(200).json({ 
-      message: 'Login successful',
-      result: { id: user.id, name: user.name, role: user.role, email: user.email },
-      token 
-    });
+    res.status(200).json({ result: { id: user.id, role: user.role }, token });
 
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
 
+// --- Update Password ---
+exports.updatePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const { User } = getModels(req);
+    const userId = req.user.id; // from auth middleware
+
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const isPasswordCorrect = await bcrypt.compare(oldPassword, user.password);
+    if (!isPasswordCorrect)
+      return res.status(400).json({ message: "Old password is incorrect." });
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    await user.update({ password: hashedNewPassword });
+
+    res.status(200).json({ message: "Password updated successfully." });
+  } catch (error) {
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
+  }
+};
+
 // --- Guest Signup (Request OTP) ---
 exports.guestSignup = async (req, res) => {
   try {
-    const { name, email, phone } = req.body;
-    const { Guest, User } = getModels(req);
+    const { name, email , phone } = req.body; // treat as email
+    const { Guest } = getModels(req);
 
     if (!name || !email || !phone) {
-      return res.status(400).json({ message: "Name, email, and phone are required." });
-    }
-
-    // Check if already a regular user
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser && existingUser.password) {
-      return res.status(409).json({ 
-        message: "This email is already registered as a regular user. Please use password login." 
-      });
+      return res.status(400).json({ message: "Name and email are required." });
     }
 
     // Find or create guest
     const [guest, created] = await Guest.findOrCreate({
       where: { mobile_number: email },
       defaults: { name, phone }
-    });
+    }
+    );
 
     if (!created && guest.name !== name) {
       guest.name = name;
       await guest.save();
     }
 
-    // Generate OTP
+    // Generate OTP (6-digit random)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
     guest.otp = otp;
     guest.otp_expires_at = otpExpiry;
     await guest.save();
 
-    // Send OTP email
+    // --- Nodemailer setup ---
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host: process.env.SMTP_HOST, // e.g., "smtp.gmail.com"
       port: process.env.SMTP_PORT || 587,
-      secure: false,
+      secure: false, // true for 465, false for other ports
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: process.env.SMTP_USER, // your email
+        pass: process.env.SMTP_PASS, // your email password or app password
       },
     });
 
@@ -139,7 +149,7 @@ exports.guestSignup = async (req, res) => {
       console.log(`OTP email sent successfully to ${email}`);
       return res.status(200).json({
         message: `OTP sent successfully to ${email}`,
-        otp: process.env.NODE_ENV === 'development' ? otp : undefined,
+        otp, // only send OTP in dev mode
       });
     } catch (mailError) {
       console.error("Nodemailer send error:", mailError);
@@ -157,25 +167,26 @@ exports.guestSignup = async (req, res) => {
   }
 };
 
-// --- Guest/User OTP Verification & Login ---
-exports.verifyOTPAndLogin = async (req, res) => {
+
+// --- Guest Login (Verify OTP) ---
+exports.guestVerifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
-    const { Guest, User } = getModels(req);
+    const { Guest } = getModels(req);
 
     if (!email || !otp) {
-      return res.status(400).json({ message: "Email and OTP are required." });
+      return res
+        .status(400)
+        .json({ message: "Email and OTP are required." });
     }
 
-    // 1. Verify OTP in guest table
     const guest = await Guest.findOne({ where: { mobile_number: email } });
     if (!guest) {
-      return res.status(404).json({ 
-        message: "No OTP request found. Please sign up first." 
-      });
+      return res
+        .status(404)
+        .json({ message: "Guest not found. Please sign up first." });
     }
 
-    // Check OTP validity
     if (
       guest.otp !== otp ||
       !guest.otp_expires_at ||
@@ -184,117 +195,25 @@ exports.verifyOTPAndLogin = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP." });
     }
 
-    // 2. Clear OTP from guest table
+    // OTP valid -> clear it
     guest.otp = null;
     guest.otp_expires_at = null;
     await guest.save();
 
-    // 3. Find or create user in users table
-    let user = await User.findOne({ where: { email } });
-    
-    if (!user) {
-      // Create new user (student) from guest data
-      user = await User.create({
-        name: guest.name,
-        email: email,
-        password: null, // No password for OTP-based users
-        phone: guest.phone,
-        role: 'guest',
-        wallet_balance: guest.wallet_balance || 0.00,
-        room_no: null
-      });
-    } else if (user.password) {
-      // If user already exists with password, they can't use OTP login
-      return res.status(400).json({
-        message: "This account uses password login. Please use password instead."
-      });
-    }
-
-    // 4. Generate JWT token
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        name: user.name, 
-        email: user.email, 
-        role: user.role,
-        phone: user.phone
-      },
+      { id: guest.id, name: guest.name, email: guest.mobile_number, role: "guest" },
       process.env.JWT_SECRET,
       { expiresIn: "72h" }
     );
 
     res.status(200).json({
-      message: "Login successful!",
-      result: { 
-        id: user.id, 
-        name: user.name, 
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        wallet_balance: user.wallet_balance
-      },
+      message: "Guest logged in successfully!",
+      result: { id: guest.id, name:guest.name , role: "guest" },
       token,
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      message: "Something went wrong.", 
-      error: error.message 
-    });
-  }
-};
-
-// --- Update Password ---
-exports.updatePassword = async (req, res) => {
-  try {
-    const { oldPassword, newPassword } = req.body;
-    const { User } = getModels(req);
-    const userId = req.user.id;
-
-    const user = await User.findByPk(userId);
-    if (!user) return res.status(404).json({ message: "User not found." });
-
-    // Check if user has password (not OTP-based user)
-    if (!user.password) {
-      return res.status(400).json({ 
-        message: "This account uses OTP login. Please set a password first." 
-      });
-    }
-
-    const isPasswordCorrect = await bcrypt.compare(oldPassword, user.password);
-    if (!isPasswordCorrect)
-      return res.status(400).json({ message: "Old password is incorrect." });
-
-    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
-    await user.update({ password: hashedNewPassword });
-
-    res.status(200).json({ message: "Password updated successfully." });
-  } catch (error) {
-    res.status(500).json({ message: "Something went wrong.", error: error.message });
-  }
-};
-
-// --- Set Password for OTP-based Users ---
-exports.setPassword = async (req, res) => {
-  try {
-    const { email, newPassword } = req.body;
-    const { User } = getModels(req);
-
-    const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ message: "User not found." });
-
-    // Check if user already has password
-    if (user.password) {
-      return res.status(400).json({ 
-        message: "Password already set. Use update password instead." 
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await user.update({ password: hashedPassword });
-
-    res.status(200).json({ message: "Password set successfully." });
-  } catch (error) {
-    res.status(500).json({ message: "Something went wrong.", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Something went wrong.", error: error.message });
   }
 };
