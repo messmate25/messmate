@@ -22,7 +22,7 @@ async function initModels() {
   const GuestOrderItem = GuestOrderItemModel(sequelize);
   const GuestOrder = GuestOrderModel(sequelize);
   const Transaction = TransactionModel(sequelize);   // ✅
-  const Consumption = consumptionModel(sequelize);
+  const MealConsumption = consumptionModel(sequelize);
   // --- Associations ---
 
   // Menu <-> WeeklyMenu
@@ -51,7 +51,7 @@ async function initModels() {
     User, Guest,
     MenuItem, WeeklyMenu, WeeklySelection, GuestOrder,        // ✅ returning new model
     GuestOrderItem,   
-    MealHistory, Transaction  , Consumption  // ✅ include new model
+    MealHistory, Transaction  , MealConsumption  // ✅ include new model
   };
 }
 
