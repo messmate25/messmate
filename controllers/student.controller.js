@@ -102,10 +102,9 @@ exports.getWeeklyMenu = async (req, res) => {
 };
 
 // --- Submit Weekly Menu Selection ---
-// --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
-    const { WeeklySelection, MealHistory, MenuItem, User, WeeklyMenu, MealConsumption } = getModels(req);
+    const { WeeklySelection, MealHistory, MenuItem, User, Transaction } = getModels(req);
     const userId = req.user.id;
     const { selections, week_start_date } = req.body;
 
@@ -163,115 +162,32 @@ exports.submitWeeklySelection = async (req, res) => {
       });
     }
 
-    // ✅ Check weekly limits for each menu item
-    const newSelectionsToAdd = Array.from(newSelectionsMap.values());
-    const menuItemIds = [...new Set(newSelectionsToAdd.map(s => s.menuItemId))];
-    
-    // Get menu items with their weekly limits
-    const menuItems = await MenuItem.findAll({
-      where: { id: menuItemIds },
-      attributes: ['id', 'name', 'weekly_limit']
-    });
-
-    // Create a map of menu items for easy access
-    const menuItemMap = new Map();
-    menuItems.forEach(item => {
-      menuItemMap.set(item.id, item);
-    });
-
-    // Check if user has exceeded weekly limit for any menu item
-    const weekStartStr = startDate.toISOString().split('T')[0];
-    const currentWeekConsumption = await MealConsumption.findAll({
-      where: {
-        userId,
-        menu_item_id: menuItemIds,
-        consumption_date: { [Op.between]: [startDate, endDate] }
-      },
-      attributes: ['menu_item_id', [sequelize.fn('COUNT', sequelize.col('menu_item_id')), 'count']],
-      group: ['menu_item_id']
-    });
-
-    // Create a map of current week consumption counts
-    const consumptionMap = new Map();
-    currentWeekConsumption.forEach(record => {
-      consumptionMap.set(record.menu_item_id, parseInt(record.dataValues.count));
-    });
-
-    // Check each new selection against weekly limits
-    const exceededLimits = [];
-    const menuItemSelectionCounts = new Map();
-
-    // Count how many times each menu item appears in new selections
-    newSelectionsToAdd.forEach(selection => {
-      const count = menuItemSelectionCounts.get(selection.menuItemId) || 0;
-      menuItemSelectionCounts.set(selection.menuItemId, count + 1);
-    });
-
-    // Check limits for each menu item
-    for (const [menuItemId, newSelectionCount] of menuItemSelectionCounts) {
-      const menuItem = menuItemMap.get(menuItemId);
-      if (!menuItem) {
-        return res.status(400).json({
-          message: `Menu item ${menuItemId} not found`
-        });
-      }
-
-      const weeklyLimit = menuItem.weekly_limit;
-      const consumedCount = consumptionMap.get(menuItemId) || 0;
-      const existingSelectionCount = existingSelections.filter(s => s.menuItemId === menuItemId).length;
-      
-      const totalAfterSelection = consumedCount + existingSelectionCount + newSelectionCount;
-      
-      if (totalAfterSelection > weeklyLimit) {
-        exceededLimits.push({
-          menu_item_id: menuItemId,
-          menu_item_name: menuItem.name,
-          weekly_limit: weeklyLimit,
-          currently_consumed: consumedCount,
-          already_selected: existingSelectionCount,
-          trying_to_add: newSelectionCount,
-          would_be_total: totalAfterSelection
-        });
-      }
-    }
-
-    // ✅ Return error if weekly limits would be exceeded
-    if (exceededLimits.length > 0) {
-      return res.status(400).json({
-        message: 'Weekly limits would be exceeded for the following items:',
-        exceeded_limits: exceededLimits
-      });
-    }
-
-    // ✅ Prepare new selections to add
-    const formattedSelectionsToAdd = newSelectionsToAdd.map(selection => ({
+    // ✅ Prepare new selections to add (no updates or deletions)
+    const newSelectionsToAdd = Array.from(newSelectionsMap.values()).map(selection => ({
       ...selection,
       userId,
       is_default: false
     }));
 
     // ✅ Add new selections to database
-    if (formattedSelectionsToAdd.length > 0) {
-      await WeeklySelection.bulkCreate(formattedSelectionsToAdd);
+    if (newSelectionsToAdd.length > 0) {
+      await WeeklySelection.bulkCreate(newSelectionsToAdd);
     }
 
     // ✅ Prepare the response
     const response = {
       message: 'Your weekly menu has been updated successfully!',
-      added: formattedSelectionsToAdd.length,
+      added: newSelectionsToAdd.length,
       existing: existingSelections.length,
-      duplicates_rejected: duplicates.length,
-      week_limits_checked: true,
-      week_start_date: week_start_date,
-      week_end_date: endDate.toISOString().split('T')[0]
+      duplicates_rejected: duplicates.length
     };
 
     // ✅ Send response immediately
     res.status(201).json(response);
 
     // ✅ Generate QR codes in background for NEW selections only
-    if (formattedSelectionsToAdd.length > 0) {
-      generateQRsInBackground(formattedSelectionsToAdd, userId, req);
+    if (newSelectionsToAdd.length > 0) {
+      generateQRsInBackground(newSelectionsToAdd, userId, req);
     }
 
   } catch (error) {
