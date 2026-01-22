@@ -9,7 +9,7 @@ const GuestModel = require("./guest.model");
 const GuestOrderItemModel = require("./guestOrderItem.model");
 const GuestOrderModel = require("./guestOrder.model");
 const TransactionModel = require("./transaction.model");   // ✅
-
+const consumptionModel = require("./consumption.model");
 async function initModels() {
   const sequelize = await createSequelize();
 
@@ -22,7 +22,7 @@ async function initModels() {
   const GuestOrderItem = GuestOrderItemModel(sequelize);
   const GuestOrder = GuestOrderModel(sequelize);
   const Transaction = TransactionModel(sequelize);   // ✅
-
+  const Consumption = consumptionModel(sequelize);
   // --- Associations ---
 
   // Menu <-> WeeklyMenu
@@ -45,13 +45,13 @@ async function initModels() {
   // User <-> Transaction
   User.hasMany(Transaction, { foreignKey: "userId" });
   Transaction.belongsTo(User, { foreignKey: "userId" });
-
+  
   return {
     sequelize,
     User, Guest,
     MenuItem, WeeklyMenu, WeeklySelection, GuestOrder,        // ✅ returning new model
     GuestOrderItem,   
-    MealHistory, Transaction   // ✅ include new model
+    MealHistory, Transaction  , Consumption  // ✅ include new model
   };
 }
 

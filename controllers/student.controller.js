@@ -105,7 +105,7 @@ exports.getWeeklyMenu = async (req, res) => {
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
-    const { WeeklySelection, MealHistory, MenuItem, User, Transaction } = getModels(req);
+    const { WeeklySelection, MealHistory, MenuItem, User, WeeklyMenu, MealConsumption } = getModels(req);
     const userId = req.user.id;
     const { selections, week_start_date } = req.body;
 
@@ -163,80 +163,121 @@ exports.submitWeeklySelection = async (req, res) => {
       });
     }
 
-    // ✅ Prepare new selections to add (no updates or deletions)
-    const newSelectionsToAdd = Array.from(newSelectionsMap.values()).map(selection => ({
+    // ✅ Check weekly limits for each menu item
+    const newSelectionsToAdd = Array.from(newSelectionsMap.values());
+    const menuItemIds = [...new Set(newSelectionsToAdd.map(s => s.menuItemId))];
+    
+    // Get menu items with their weekly limits
+    const menuItems = await MenuItem.findAll({
+      where: { id: menuItemIds },
+      attributes: ['id', 'name', 'weekly_limit']
+    });
+
+    // Create a map of menu items for easy access
+    const menuItemMap = new Map();
+    menuItems.forEach(item => {
+      menuItemMap.set(item.id, item);
+    });
+
+    // Check if user has exceeded weekly limit for any menu item
+    const weekStartStr = startDate.toISOString().split('T')[0];
+    const currentWeekConsumption = await MealConsumption.findAll({
+      where: {
+        userId,
+        menu_item_id: menuItemIds,
+        consumption_date: { [Op.between]: [startDate, endDate] }
+      },
+      attributes: ['menu_item_id', [sequelize.fn('COUNT', sequelize.col('menu_item_id')), 'count']],
+      group: ['menu_item_id']
+    });
+
+    // Create a map of current week consumption counts
+    const consumptionMap = new Map();
+    currentWeekConsumption.forEach(record => {
+      consumptionMap.set(record.menu_item_id, parseInt(record.dataValues.count));
+    });
+
+    // Check each new selection against weekly limits
+    const exceededLimits = [];
+    const menuItemSelectionCounts = new Map();
+
+    // Count how many times each menu item appears in new selections
+    newSelectionsToAdd.forEach(selection => {
+      const count = menuItemSelectionCounts.get(selection.menuItemId) || 0;
+      menuItemSelectionCounts.set(selection.menuItemId, count + 1);
+    });
+
+    // Check limits for each menu item
+    for (const [menuItemId, newSelectionCount] of menuItemSelectionCounts) {
+      const menuItem = menuItemMap.get(menuItemId);
+      if (!menuItem) {
+        return res.status(400).json({
+          message: `Menu item ${menuItemId} not found`
+        });
+      }
+
+      const weeklyLimit = menuItem.weekly_limit;
+      const consumedCount = consumptionMap.get(menuItemId) || 0;
+      const existingSelectionCount = existingSelections.filter(s => s.menuItemId === menuItemId).length;
+      
+      const totalAfterSelection = consumedCount + existingSelectionCount + newSelectionCount;
+      
+      if (totalAfterSelection > weeklyLimit) {
+        exceededLimits.push({
+          menu_item_id: menuItemId,
+          menu_item_name: menuItem.name,
+          weekly_limit: weeklyLimit,
+          currently_consumed: consumedCount,
+          already_selected: existingSelectionCount,
+          trying_to_add: newSelectionCount,
+          would_be_total: totalAfterSelection
+        });
+      }
+    }
+
+    // ✅ Return error if weekly limits would be exceeded
+    if (exceededLimits.length > 0) {
+      return res.status(400).json({
+        message: 'Weekly limits would be exceeded for the following items:',
+        exceeded_limits: exceededLimits
+      });
+    }
+
+    // ✅ Prepare new selections to add
+    const formattedSelectionsToAdd = newSelectionsToAdd.map(selection => ({
       ...selection,
       userId,
       is_default: false
     }));
 
-    let totalExtraCharge = 0;
-    const processedMenuItems = new Set();
-
-    // ✅ Calculate extra charges only for NEW selections
-    for (const s of newSelectionsToAdd) {
-      if (!processedMenuItems.has(s.menuItemId)) {
-        const menuItem = await MenuItem.findByPk(s.menuItemId);
-        if (menuItem && menuItem.extra_price) {
-          totalExtraCharge += parseFloat(menuItem.extra_price);
-          processedMenuItems.add(s.menuItemId);
-        }
-      }
-    }
-
-    // ✅ Process wallet deduction only if there are new selections with charges
-    if (newSelectionsToAdd.length > 0 && totalExtraCharge > 0) {
-      const user = await User.findByPk(userId);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-
-      if (parseFloat(user.wallet_balance) < totalExtraCharge) {
-        return res.status(400).json({
-          message: 'Insufficient wallet balance. Please recharge your wallet.'
-        });
-      }
-
-      // ✅ Deduct from wallet
-      user.wallet_balance = parseFloat(user.wallet_balance) - totalExtraCharge;
-      await user.save();
-
-      // ✅ Log transaction (uncomment when ready)
-      // await Transaction.create({
-      //   userId,
-      //   amount: -totalExtraCharge,
-      //   type: 'weekly_selection_extra_charge',
-      //   description: `Extra charges for ${newSelectionsToAdd.length} new weekly selections`
-      // });
-    }
-
     // ✅ Add new selections to database
-    if (newSelectionsToAdd.length > 0) {
-      await WeeklySelection.bulkCreate(newSelectionsToAdd);
+    if (formattedSelectionsToAdd.length > 0) {
+      await WeeklySelection.bulkCreate(formattedSelectionsToAdd);
     }
 
     // ✅ Prepare the response
     const response = {
       message: 'Your weekly menu has been updated successfully!',
-      total_extra_charge: totalExtraCharge,
-      added: newSelectionsToAdd.length,
+      added: formattedSelectionsToAdd.length,
       existing: existingSelections.length,
-      duplicates_rejected: duplicates.length
+      duplicates_rejected: duplicates.length,
+      week_limits_checked: true,
+      week_start_date: week_start_date,
+      week_end_date: endDate.toISOString().split('T')[0]
     };
 
     // ✅ Send response immediately
     res.status(201).json(response);
 
     // ✅ Generate QR codes in background for NEW selections only
-    if (newSelectionsToAdd.length > 0) {
-      generateQRsInBackground(newSelectionsToAdd, userId, req);
+    if (formattedSelectionsToAdd.length > 0) {
+      generateQRsInBackground(formattedSelectionsToAdd, userId, req);
     }
 
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
-
 // ✅ Helper function to generate QR codes in the background
 async function generateQRsInBackground(selections, userId, req) {
   try {
