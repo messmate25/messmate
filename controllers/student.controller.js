@@ -28,9 +28,6 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// --- Update Wallet Balance ---
-
-
 exports.getWeeklyMenu = async (req, res) => {
   try {
     const { WeeklyMenu, MenuItem, WeeklySelection } = getModels(req);
@@ -49,21 +46,31 @@ exports.getWeeklyMenu = async (req, res) => {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    // ✅ Get user's existing selections for this week
+    // ✅ Get user's existing selections for this week WITH meal_date and meal_type
     const userSelections = await WeeklySelection.findAll({
-      where: { 
+      where: {
         userId,
-        meal_date: { 
-          [Op.between]: [weekStart, weekEnd] 
+        meal_date: {
+          [Op.between]: [weekStart, weekEnd]
         }
       },
-      attributes: ['menuItemId']
+      attributes: ['menuItemId', 'meal_date', 'meal_type']
     });
 
-    // ✅ Count how many times user selected each menu item this week
+    // ✅ Create a map to check if user already selected a meal for specific day and meal type
+    const userSelectedMealSlots = new Map();
     const userSelectionCounts = {};
+
     userSelections.forEach(selection => {
       const menuItemId = selection.menuItemId;
+      const mealDate = selection.meal_date;
+      const mealType = selection.meal_type;
+
+      // For checking if slot is already taken
+      const slotKey = `${mealDate}-${mealType}`;
+      userSelectedMealSlots.set(slotKey, menuItemId);
+
+      // For counting weekly selections per menu item
       userSelectionCounts[menuItemId] = (userSelectionCounts[menuItemId] || 0) + 1;
     });
 
@@ -84,11 +91,11 @@ exports.getWeeklyMenu = async (req, res) => {
     // ✅ Get current date (without time for proper comparison)
     const currentDate = new Date();
     currentDate.setHours(0, 0, 0, 0);
-    
+
     // ✅ Calculate the date for each day of the week
     const dayDateMap = {};
     const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    
+
     // Map each day_of_week to its actual date
     daysOfWeek.forEach((day, index) => {
       const dayDate = new Date(weekStart);
@@ -100,25 +107,34 @@ exports.getWeeklyMenu = async (req, res) => {
     for (const item of menu) {
       const day = item.day_of_week;
       const meal = item.meal_type;
-      
+
       // ✅ Check if this day's date is in the past
       const dayDate = dayDateMap[day.toLowerCase()];
       if (dayDate && dayDate < currentDate) {
         continue; // Skip past days
       }
-      
+
       if (!groupedMenu[day]) groupedMenu[day] = {};
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
-      
+
+      // ✅ Check if user already selected a meal for this specific day and meal type
+      const slotKey = `${dayDate.toISOString().split('T')[0]}-${meal}`;
+
+      if (userSelectedMealSlots.has(slotKey)) {
+        // User already selected a meal for this slot, send empty object
+        groupedMenu[day][meal].push({});
+        continue;
+      }
+
       // ✅ Get menu item
       const menuItem = item.MenuItem;
-      
+
       // ✅ Calculate remaining weekly limit for this user
       const menuItemId = menuItem.id;
       const baseWeeklyLimit = menuItem.weekly_limit;
       const alreadySelectedCount = userSelectionCounts[menuItemId] || 0;
       const remainingLimit = Math.max(0, baseWeeklyLimit - alreadySelectedCount);
-      
+
       // ✅ Create menu item object with dynamic weekly_limit
       const dynamicMenuItem = {
         id: menuItem.id,
@@ -126,17 +142,17 @@ exports.getWeeklyMenu = async (req, res) => {
         description: menuItem.description,
         image_url: menuItem.image_url,
         extra_price: menuItem.extra_price,
-        weekly_limit: remainingLimit, // CHANGED: Send remaining limit instead of base limit
+        weekly_limit: remainingLimit, // Send remaining limit instead of base limit
         monthly_limit: menuItem.monthly_limit
       };
-      
+
       groupedMenu[day][meal].push(dynamicMenuItem);
     }
 
     // ✅ If all days are filtered out (all in past), return appropriate message
     if (Object.keys(groupedMenu).length === 0) {
-      return res.status(404).json({ 
-        message: `No upcoming days found in the menu for the week starting ${week_start_date}.` 
+      return res.status(404).json({
+        message: `No upcoming days found in the menu for the week starting ${week_start_date}.`
       });
     }
 
@@ -165,9 +181,9 @@ exports.submitWeeklySelection = async (req, res) => {
 
     // ✅ Get existing selections for this week
     const existingSelections = await WeeklySelection.findAll({
-      where: { 
-        userId, 
-        meal_date: { [Op.between]: [startDate, endDate] } 
+      where: {
+        userId,
+        meal_date: { [Op.between]: [startDate, endDate] }
       },
       include: [{ model: MenuItem }]
     });
@@ -182,30 +198,30 @@ exports.submitWeeklySelection = async (req, res) => {
     // ✅ Validation: Check for duplicates in new selections
     const newSelectionsMap = new Map();
     const duplicates = [];
-    
+
     for (const selection of selections) {
       const key = `${selection.meal_date}-${selection.meal_type}-${selection.menuItemId}`;
-      
+
       // Check if this exact selection already exists in DB
       if (existingSelectionMap.has(key)) {
         duplicates.push(`Meal ${selection.menuItemId} for ${selection.meal_date} (${selection.meal_type})`);
         continue;
       }
-      
+
       // Check for duplicates within the new submission
       if (newSelectionsMap.has(key)) {
         duplicates.push(`Meal ${selection.menuItemId} for ${selection.meal_date} (${selection.meal_type})`);
         continue;
       }
-      
+
       newSelectionsMap.set(key, selection);
     }
 
     // ✅ Return error if duplicates found
     if (duplicates.length > 0) {
-      return res.status(400).json({ 
-        message: 'Duplicate selections found:', 
-        duplicates 
+      return res.status(400).json({
+        message: 'Duplicate selections found:',
+        duplicates
       });
     }
 
@@ -246,10 +262,10 @@ exports.submitWeeklySelection = async (req, res) => {
 async function generateQRsInBackground(selections, userId, req) {
   try {
     const { WeeklySelection, MenuItem, MealHistory } = getModels(req);
-    
+
     for (const selection of selections) {
       const { meal_date, meal_type } = selection;
-      
+
       try {
         // Check if QR already exists for this user, meal_date, and meal_type
         const existingQR = await MealHistory.findOne({
@@ -299,7 +315,7 @@ async function generateQRsInBackground(selections, userId, req) {
         });
 
         console.log(`QR generated successfully for ${meal_type} on ${meal_date}`);
-        
+
       } catch (qrError) {
         console.error(`Error generating QR for ${meal_type} on ${meal_date}:`, qrError);
         // Don't throw here - continue with other selections
@@ -337,7 +353,7 @@ exports.generateMealQR = async (req, res) => {
         });
       } else {
         // ❌ If QR exists but is invalid, return QR expired message
-        return res.status(410).json({ 
+        return res.status(410).json({
           message: `QR for ${meal_type} on ${meal_date} is expired.`,
           meal_history_id: existingQR.id
         });
@@ -509,7 +525,7 @@ exports.previewWeeklySelection = async (req, res) => {
 exports.getWeeklySelections = async (req, res) => {
   try {
     // Await models
-    const { WeeklySelection, MenuItem } =  getModels(req);
+    const { WeeklySelection, MenuItem } = getModels(req);
 
     const userId = req.user.id;
 
