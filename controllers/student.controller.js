@@ -46,7 +46,7 @@ exports.getWeeklyMenu = async (req, res) => {
       where: { week_start_date },
       include: [{
         model: MenuItem,
-        attributes: ['id', 'name', 'description', 'image_url', 'extra_price']
+        attributes: ['id', 'name', 'description', 'image_url', 'extra_price' , 'weekly_limit', 'monthly_limit']
       }],
       order: [['day_of_week'], ['meal_type']]
     });
