@@ -31,22 +31,48 @@ exports.getProfile = async (req, res) => {
 // --- Update Wallet Balance ---
 
 
-
-// --- Get Weekly Menu (for Students) ---
 exports.getWeeklyMenu = async (req, res) => {
   try {
-    const { WeeklyMenu, MenuItem } = getModels(req);
+    const { WeeklyMenu, MenuItem, WeeklySelection } = getModels(req);
     const { week_start_date } = req.query;
+    const userId = req.user?.id; // Get user ID from auth middleware
 
     if (!week_start_date) {
       return res.status(400).json({ message: 'Please provide a week_start_date.' });
     }
 
+    if (!userId) {
+      return res.status(401).json({ message: 'User authentication required.' });
+    }
+
+    const weekStart = new Date(week_start_date);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    // ✅ Get user's existing selections for this week
+    const userSelections = await WeeklySelection.findAll({
+      where: { 
+        userId,
+        meal_date: { 
+          [Op.between]: [weekStart, weekEnd] 
+        }
+      },
+      attributes: ['menuItemId']
+    });
+
+    // ✅ Count how many times user selected each menu item this week
+    const userSelectionCounts = {};
+    userSelections.forEach(selection => {
+      const menuItemId = selection.menuItemId;
+      userSelectionCounts[menuItemId] = (userSelectionCounts[menuItemId] || 0) + 1;
+    });
+
+    // ✅ Get the weekly menu
     const menu = await WeeklyMenu.findAll({
       where: { week_start_date },
       include: [{
         model: MenuItem,
-        attributes: ['id', 'name', 'description', 'image_url', 'extra_price' , 'weekly_limit', 'monthly_limit']
+        attributes: ['id', 'name', 'description', 'image_url', 'extra_price', 'weekly_limit', 'monthly_limit']
       }],
       order: [['day_of_week'], ['meal_type']]
     });
@@ -57,10 +83,9 @@ exports.getWeeklyMenu = async (req, res) => {
 
     // ✅ Get current date (without time for proper comparison)
     const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+    currentDate.setHours(0, 0, 0, 0);
     
     // ✅ Calculate the date for each day of the week
-    const weekStart = new Date(week_start_date);
     const dayDateMap = {};
     const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     
@@ -84,7 +109,28 @@ exports.getWeeklyMenu = async (req, res) => {
       
       if (!groupedMenu[day]) groupedMenu[day] = {};
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
-      groupedMenu[day][meal].push(item.MenuItem);
+      
+      // ✅ Get menu item
+      const menuItem = item.MenuItem;
+      
+      // ✅ Calculate remaining weekly limit for this user
+      const menuItemId = menuItem.id;
+      const baseWeeklyLimit = menuItem.weekly_limit;
+      const alreadySelectedCount = userSelectionCounts[menuItemId] || 0;
+      const remainingLimit = Math.max(0, baseWeeklyLimit - alreadySelectedCount);
+      
+      // ✅ Create menu item object with dynamic weekly_limit
+      const dynamicMenuItem = {
+        id: menuItem.id,
+        name: menuItem.name,
+        description: menuItem.description,
+        image_url: menuItem.image_url,
+        extra_price: menuItem.extra_price,
+        weekly_limit: remainingLimit, // CHANGED: Send remaining limit instead of base limit
+        monthly_limit: menuItem.monthly_limit
+      };
+      
+      groupedMenu[day][meal].push(dynamicMenuItem);
     }
 
     // ✅ If all days are filtered out (all in past), return appropriate message
@@ -94,6 +140,7 @@ exports.getWeeklyMenu = async (req, res) => {
       });
     }
 
+    // ✅ Return the same structure as before, just with updated weekly_limit values
     res.status(200).json(groupedMenu);
 
   } catch (error) {
@@ -127,33 +174,14 @@ exports.submitWeeklySelection = async (req, res) => {
 
     // ✅ Create a map of existing selections for duplicate checking
     const existingSelectionMap = new Map();
-    const menuItemCountMap = new Map(); // Track count of each menuItem for the user in this week
-    
     existingSelections.forEach(selection => {
       const key = `${selection.meal_date}-${selection.meal_type}-${selection.menuItemId}`;
       existingSelectionMap.set(key, selection);
-      
-      // Count occurrences of each menuItemId for this user in this week
-      const count = menuItemCountMap.get(selection.menuItemId) || 0;
-      menuItemCountMap.set(selection.menuItemId, count + 1);
     });
 
-    // ✅ Get menu items to check weekly limits
-    const menuItemIds = [...new Set(selections.map(s => s.menuItemId))];
-    const menuItems = await MenuItem.findAll({
-      where: { id: menuItemIds }
-    });
-    
-    // Create a map for quick access to menu item weekly limits
-    const menuItemLimitMap = new Map();
-    menuItems.forEach(item => {
-      menuItemLimitMap.set(item.id, item.weekly_limit);
-    });
-
-    // ✅ Validation: Check for duplicates and weekly limits
+    // ✅ Validation: Check for duplicates in new selections
     const newSelectionsMap = new Map();
     const duplicates = [];
-    const limitExceededItems = [];
     
     for (const selection of selections) {
       const key = `${selection.meal_date}-${selection.meal_type}-${selection.menuItemId}`;
@@ -170,49 +198,14 @@ exports.submitWeeklySelection = async (req, res) => {
         continue;
       }
       
-      // Check weekly limit for this menu item
-      const existingCount = menuItemCountMap.get(selection.menuItemId) || 0;
-      const weeklyLimit = menuItemLimitMap.get(selection.menuItemId);
-      
-      // Count how many times this menu item appears in new selections
-      const newSelectionsForThisItem = selections.filter(s => 
-        s.menuItemId === selection.menuItemId && 
-        !duplicates.includes(`Meal ${s.menuItemId} for ${s.meal_date} (${s.meal_type})`)
-      ).length;
-      
-      const totalCountAfterAddition = existingCount + newSelectionsForThisItem;
-      
-      if (totalCountAfterAddition > weeklyLimit) {
-        // Add to limit exceeded items if not already added
-        const menuItem = menuItems.find(item => item.id === selection.menuItemId);
-        if (menuItem && !limitExceededItems.includes(menuItem.name)) {
-          limitExceededItems.push(menuItem.name);
-        }
-        continue; // Skip this selection
-      }
-      
-      // Update the count for this menu item in new selections
-      const currentCount = menuItemCountMap.get(selection.menuItemId) || 0;
-      menuItemCountMap.set(selection.menuItemId, currentCount + 1);
-      
       newSelectionsMap.set(key, selection);
     }
 
-    // ✅ Prepare response messages
-    let errorMessage = '';
+    // ✅ Return error if duplicates found
     if (duplicates.length > 0) {
-      errorMessage += `Duplicate selections found: ${duplicates.join(', ')}. `;
-    }
-    if (limitExceededItems.length > 0) {
-      errorMessage += `Weekly limit exceeded for: ${limitExceededItems.join(', ')}. `;
-    }
-    
-    // ✅ Return error if duplicates or limit exceeded items found
-    if (duplicates.length > 0 || limitExceededItems.length > 0) {
       return res.status(400).json({ 
-        message: errorMessage.trim(),
-        duplicates,
-        limit_exceeded: limitExceededItems
+        message: 'Duplicate selections found:', 
+        duplicates 
       });
     }
 
@@ -233,8 +226,7 @@ exports.submitWeeklySelection = async (req, res) => {
       message: 'Your weekly menu has been updated successfully!',
       added: newSelectionsToAdd.length,
       existing: existingSelections.length,
-      duplicates_rejected: duplicates.length,
-      limit_exceeded_rejected: limitExceededItems.length
+      duplicates_rejected: duplicates.length
     };
 
     // ✅ Send response immediately
@@ -249,6 +241,7 @@ exports.submitWeeklySelection = async (req, res) => {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
 // ✅ Helper function to generate QR codes in the background
 async function generateQRsInBackground(selections, userId, req) {
   try {
