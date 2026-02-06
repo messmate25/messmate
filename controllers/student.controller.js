@@ -127,14 +127,33 @@ exports.submitWeeklySelection = async (req, res) => {
 
     // ✅ Create a map of existing selections for duplicate checking
     const existingSelectionMap = new Map();
+    const menuItemCountMap = new Map(); // Track count of each menuItem for the user in this week
+    
     existingSelections.forEach(selection => {
       const key = `${selection.meal_date}-${selection.meal_type}-${selection.menuItemId}`;
       existingSelectionMap.set(key, selection);
+      
+      // Count occurrences of each menuItemId for this user in this week
+      const count = menuItemCountMap.get(selection.menuItemId) || 0;
+      menuItemCountMap.set(selection.menuItemId, count + 1);
     });
 
-    // ✅ Validation: Check for duplicates in new selections
+    // ✅ Get menu items to check weekly limits
+    const menuItemIds = [...new Set(selections.map(s => s.menuItemId))];
+    const menuItems = await MenuItem.findAll({
+      where: { id: menuItemIds }
+    });
+    
+    // Create a map for quick access to menu item weekly limits
+    const menuItemLimitMap = new Map();
+    menuItems.forEach(item => {
+      menuItemLimitMap.set(item.id, item.weekly_limit);
+    });
+
+    // ✅ Validation: Check for duplicates and weekly limits
     const newSelectionsMap = new Map();
     const duplicates = [];
+    const limitExceededItems = [];
     
     for (const selection of selections) {
       const key = `${selection.meal_date}-${selection.meal_type}-${selection.menuItemId}`;
@@ -151,14 +170,49 @@ exports.submitWeeklySelection = async (req, res) => {
         continue;
       }
       
+      // Check weekly limit for this menu item
+      const existingCount = menuItemCountMap.get(selection.menuItemId) || 0;
+      const weeklyLimit = menuItemLimitMap.get(selection.menuItemId);
+      
+      // Count how many times this menu item appears in new selections
+      const newSelectionsForThisItem = selections.filter(s => 
+        s.menuItemId === selection.menuItemId && 
+        !duplicates.includes(`Meal ${s.menuItemId} for ${s.meal_date} (${s.meal_type})`)
+      ).length;
+      
+      const totalCountAfterAddition = existingCount + newSelectionsForThisItem;
+      
+      if (totalCountAfterAddition > weeklyLimit) {
+        // Add to limit exceeded items if not already added
+        const menuItem = menuItems.find(item => item.id === selection.menuItemId);
+        if (menuItem && !limitExceededItems.includes(menuItem.name)) {
+          limitExceededItems.push(menuItem.name);
+        }
+        continue; // Skip this selection
+      }
+      
+      // Update the count for this menu item in new selections
+      const currentCount = menuItemCountMap.get(selection.menuItemId) || 0;
+      menuItemCountMap.set(selection.menuItemId, currentCount + 1);
+      
       newSelectionsMap.set(key, selection);
     }
 
-    // ✅ Return error if duplicates found
+    // ✅ Prepare response messages
+    let errorMessage = '';
     if (duplicates.length > 0) {
+      errorMessage += `Duplicate selections found: ${duplicates.join(', ')}. `;
+    }
+    if (limitExceededItems.length > 0) {
+      errorMessage += `Weekly limit exceeded for: ${limitExceededItems.join(', ')}. `;
+    }
+    
+    // ✅ Return error if duplicates or limit exceeded items found
+    if (duplicates.length > 0 || limitExceededItems.length > 0) {
       return res.status(400).json({ 
-        message: 'Duplicate selections found:', 
-        duplicates 
+        message: errorMessage.trim(),
+        duplicates,
+        limit_exceeded: limitExceededItems
       });
     }
 
@@ -179,7 +233,8 @@ exports.submitWeeklySelection = async (req, res) => {
       message: 'Your weekly menu has been updated successfully!',
       added: newSelectionsToAdd.length,
       existing: existingSelections.length,
-      duplicates_rejected: duplicates.length
+      duplicates_rejected: duplicates.length,
+      limit_exceeded_rejected: limitExceededItems.length
     };
 
     // ✅ Send response immediately
