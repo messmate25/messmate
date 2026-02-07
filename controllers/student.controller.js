@@ -43,24 +43,29 @@ exports.getWeeklyMenu = async (req, res) => {
     }
 
     // -----------------------------
-    // ✅ SAFE DATE PARSING (LOCAL)
+    // ✅ PROPER TIMEZONE HANDLING
     // -----------------------------
-    const [year, month, day] = week_start_date.split('-').map(Number);
-    const weekStart = new Date(year, month - 1, day); // LOCAL date
+    // Parse the input date in UTC
+    const weekStartUTC = new Date(week_start_date + 'T00:00:00Z');
+    
+    if (isNaN(weekStartUTC.getTime())) {
+      return res.status(400).json({ message: 'Invalid week_start_date format.' });
+    }
 
-    const weekEnd = new Date(year, month - 1, day + 6);
+    // Create weekEnd in UTC
+    const weekEndUTC = new Date(weekStartUTC);
+    weekEndUTC.setDate(weekEndUTC.getDate() + 6);
 
-    // YYYY-MM-DD helper
-    const formatDate = (date) =>
-      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-        date.getDate()
-      ).padStart(2, '0')}`;
+    // Format dates as YYYY-MM-DD strings for database queries
+    const formatDateUTC = (date) => {
+      return date.toISOString().split('T')[0];
+    };
 
-    const weekStartStr = formatDate(weekStart);
-    const weekEndStr = formatDate(weekEnd);
+    const weekStartStr = formatDateUTC(weekStartUTC);
+    const weekEndStr = formatDateUTC(weekEndUTC);
 
     // -----------------------------
-    // ✅ FETCH USER SELECTIONS
+    // ✅ FETCH USER SELECTIONS (using UTC dates)
     // -----------------------------
     const userSelections = await WeeklySelection.findAll({
       where: {
@@ -79,7 +84,7 @@ exports.getWeeklyMenu = async (req, res) => {
     const userSelectionCounts = {};
 
     userSelections.forEach(selection => {
-      const mealDateStr = selection.meal_date; // already YYYY-MM-DD
+      const mealDateStr = selection.meal_date; // YYYY-MM-DD (UTC)
       const mealType = selection.meal_type;
       const menuItemId = selection.menuItemId;
 
@@ -116,13 +121,18 @@ exports.getWeeklyMenu = async (req, res) => {
     }
 
     // -----------------------------
-    // ✅ TODAY (LOCAL DATE ONLY)
+    // ✅ TODAY IN UTC (for consistent comparison)
     // -----------------------------
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const nowUTC = new Date();
+    const todayUTC = new Date(Date.UTC(
+      nowUTC.getUTCFullYear(),
+      nowUTC.getUTCMonth(),
+      nowUTC.getUTCDate()
+    ));
+    const todayStr = formatDateUTC(todayUTC);
 
     // -----------------------------
-    // ✅ MAP DAYS TO DATES
+    // ✅ MAP DAYS TO UTC DATES
     // -----------------------------
     const daysOfWeek = [
       'sunday',
@@ -135,10 +145,13 @@ exports.getWeeklyMenu = async (req, res) => {
     ];
 
     const dayDateMap = {};
+    const dayDateStrMap = {}; // Map to store date strings for each day
+    
     daysOfWeek.forEach((dayName, index) => {
-      const d = new Date(weekStart);
-      d.setDate(weekStart.getDate() + index);
+      const d = new Date(weekStartUTC);
+      d.setUTCDate(weekStartUTC.getUTCDate() + index);
       dayDateMap[dayName] = d;
+      dayDateStrMap[dayName] = formatDateUTC(d);
     });
 
     // -----------------------------
@@ -151,15 +164,17 @@ exports.getWeeklyMenu = async (req, res) => {
       const meal = item.meal_type;
 
       const dayDate = dayDateMap[day.toLowerCase()];
+      const dayDateStr = dayDateStrMap[day.toLowerCase()];
+      
       if (!dayDate) continue;
 
-      // Skip past days
-      if (dayDate < today) continue;
+      // Compare UTC dates (not local dates)
+      // Only skip if the entire day has passed in UTC
+      if (dayDateStr < todayStr) continue;
 
       if (!groupedMenu[day]) groupedMenu[day] = {};
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
 
-      const dayDateStr = formatDate(dayDate);
       const slotKey = `${dayDateStr}-${meal}`;
 
       // If user already selected this slot
@@ -202,7 +217,6 @@ exports.getWeeklyMenu = async (req, res) => {
     });
   }
 };
-
 
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
