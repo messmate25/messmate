@@ -2,7 +2,6 @@
 
 const { Op } = require('sequelize');
 const qrcode = require('qrcode');
-const moment = require('moment-timezone');
 
 /**
  * Helper to get initialized models from request
@@ -29,12 +28,11 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-
 exports.getWeeklyMenu = async (req, res) => {
   try {
     const { WeeklyMenu, MenuItem, WeeklySelection } = getModels(req);
     const { week_start_date } = req.query;
-    const userId = req.user?.id;
+    const userId = req.user?.id; // Get user ID from auth middleware
 
     if (!week_start_date) {
       return res.status(400).json({ message: 'Please provide a week_start_date.' });
@@ -44,183 +42,127 @@ exports.getWeeklyMenu = async (req, res) => {
       return res.status(401).json({ message: 'User authentication required.' });
     }
 
-    // -----------------------------
-    // ✅ SET IST TIMEZONE
-    // -----------------------------
-    const IST = 'Asia/Kolkata';
-    const todayIST = moment().tz(IST).format('YYYY-MM-DD');
+    const weekStart = new Date(week_start_date);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
 
-    // -----------------------------
-    // ✅ PARSE INPUT DATE IN IST
-    // -----------------------------
-    const weekStartMoment = moment.tz(week_start_date, 'YYYY-MM-DD', IST);
-    
-    if (!weekStartMoment.isValid()) {
-      return res.status(400).json({ message: 'Invalid week_start_date format.' });
-    }
-
-    const weekEndMoment = weekStartMoment.clone().add(6, 'days');
-
-    // Convert to UTC strings for database queries
-    const weekStartUTC = weekStartMoment.utc().format('YYYY-MM-DD');
-    const weekEndUTC = weekEndMoment.utc().format('YYYY-MM-DD');
-
-    // -----------------------------
-    // ✅ FETCH USER SELECTIONS
-    // -----------------------------
+    // ✅ Get user's existing selections for this week WITH meal_date and meal_type
     const userSelections = await WeeklySelection.findAll({
       where: {
         userId,
         meal_date: {
-          [Op.between]: [weekStartUTC, weekEndUTC]
+          [Op.between]: [weekStart, weekEnd]
         }
       },
       attributes: ['menuItemId', 'meal_date', 'meal_type']
     });
 
-    // -----------------------------
-    // ✅ MAP USER SELECTIONS (in IST)
-    // -----------------------------
+    // ✅ Create a map to check if user already selected a meal for specific day and meal type
     const userSelectedMealSlots = new Map();
     const userSelectionCounts = {};
 
     userSelections.forEach(selection => {
-      // Convert UTC date from DB to IST
-      const mealDateUTC = selection.meal_date; // YYYY-MM-DD (UTC)
-      const mealDateIST = moment.utc(mealDateUTC + 'T00:00:00')
-        .tz(IST)
-        .format('YYYY-MM-DD');
-      
-      const mealType = selection.meal_type;
       const menuItemId = selection.menuItemId;
+      const mealDate = selection.meal_date;
+      const mealType = selection.meal_type;
 
-      const slotKey = `${mealDateIST}-${mealType}`;
+      // For checking if slot is already taken
+      const slotKey = `${mealDate}-${mealType}`;
       userSelectedMealSlots.set(slotKey, menuItemId);
 
+      // For counting weekly selections per menu item
       userSelectionCounts[menuItemId] = (userSelectionCounts[menuItemId] || 0) + 1;
     });
 
-    // -----------------------------
-    // ✅ FETCH WEEKLY MENU
-    // -----------------------------
+    // ✅ Get the weekly menu
     const menu = await WeeklyMenu.findAll({
-      where: { week_start_date: weekStartUTC },
+      where: { week_start_date },
       include: [{
         model: MenuItem,
-        attributes: [
-          'id',
-          'name',
-          'description',
-          'image_url',
-          'extra_price',
-          'weekly_limit',
-          'monthly_limit'
-        ]
+        attributes: ['id', 'name', 'description', 'image_url', 'extra_price', 'weekly_limit', 'monthly_limit']
       }],
       order: [['day_of_week'], ['meal_type']]
     });
 
     if (!menu || menu.length === 0) {
-      return res.status(404).json({
-        message: `No menu found for the week starting ${weekStartMoment.format('YYYY-MM-DD')}.`
-      });
+      return res.status(404).json({ message: `No menu found for the week starting ${week_start_date}.` });
     }
 
-    // -----------------------------
-    // ✅ MAP DAYS TO IST DATES - CORRECTED
-    // -----------------------------
-    // Your WeeklyMenu has day_of_week (like 'monday', 'tuesday', etc.)
-    // We need to map these to actual IST dates for the requested week
-    
-    const daysOfWeek = [
-      'sunday',
-      'monday', 
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday'
-    ];
+    // ✅ Get current date (without time for proper comparison)
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
 
-    // Create mapping from day name to IST date string
-    const dayToDateMap = {};
-    const weekStartDayOfWeek = weekStartMoment.day(); // 0 = Sunday, 1 = Monday, etc.
-    
-    daysOfWeek.forEach((dayName, index) => {
-      // Calculate the date for this day in the requested week
-      let dayOffset = index - weekStartDayOfWeek;
-      if (dayOffset < 0) {
-        dayOffset += 7; // Wrap around to next week
-      }
-      
-      const dayDate = weekStartMoment.clone().add(dayOffset, 'days');
-      dayToDateMap[dayName] = dayDate.format('YYYY-MM-DD');
+    // ✅ Calculate the date for each day of the week
+    const dayDateMap = {};
+    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+    // Map each day_of_week to its actual date
+    daysOfWeek.forEach((day, index) => {
+      const dayDate = new Date(weekStart);
+      dayDate.setDate(weekStart.getDate() + index);
+      dayDateMap[day] = dayDate;
     });
 
-    // -----------------------------
-    // ✅ BUILD RESPONSE
-    // -----------------------------
     const groupedMenu = {};
-
     for (const item of menu) {
-      const day = item.day_of_week.toLowerCase();
+      const day = item.day_of_week;
       const meal = item.meal_type;
 
-      // Get the actual IST date for this day in the week
-      const dayDateStr = dayToDateMap[day];
-      
-      if (!dayDateStr) continue;
-
-      // Skip past days (comparison in IST)
-      if (dayDateStr < todayIST) continue;
+      // ✅ Check if this day's date is in the past
+      const dayDate = dayDateMap[day.toLowerCase()];
+      if (dayDate && dayDate < currentDate) {
+        continue; // Skip past days
+      }
 
       if (!groupedMenu[day]) groupedMenu[day] = {};
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
 
-      const slotKey = `${dayDateStr}-${meal}`;
+      // ✅ Check if user already selected a meal for this specific day and meal type
+      const slotKey = `${dayDate.toISOString().split('T')[0]}-${meal}`;
 
-      // Check if user has already selected this meal slot
       if (userSelectedMealSlots.has(slotKey)) {
+        // User already selected a meal for this slot, send empty object
         groupedMenu[day][meal].push({});
         continue;
       }
 
+      // ✅ Get menu item
       const menuItem = item.MenuItem;
+
+      // ✅ Calculate remaining weekly limit for this user
       const menuItemId = menuItem.id;
-
       const baseWeeklyLimit = menuItem.weekly_limit;
-      const usedCount = userSelectionCounts[menuItemId] || 0;
-      const remainingLimit = Math.max(0, baseWeeklyLimit - usedCount);
+      const alreadySelectedCount = userSelectionCounts[menuItemId] || 0;
+      const remainingLimit = Math.max(0, baseWeeklyLimit - alreadySelectedCount);
 
-      groupedMenu[day][meal].push({
+      // ✅ Create menu item object with dynamic weekly_limit
+      const dynamicMenuItem = {
         id: menuItem.id,
         name: menuItem.name,
         description: menuItem.description,
         image_url: menuItem.image_url,
         extra_price: menuItem.extra_price,
-        weekly_limit: remainingLimit,
+        weekly_limit: remainingLimit, // Send remaining limit instead of base limit
         monthly_limit: menuItem.monthly_limit
-      });
+      };
+
+      groupedMenu[day][meal].push(dynamicMenuItem);
     }
 
+    // ✅ If all days are filtered out (all in past), return appropriate message
     if (Object.keys(groupedMenu).length === 0) {
       return res.status(404).json({
-        message: `No upcoming days found in the menu for the week starting ${weekStartMoment.format('YYYY-MM-DD')}.`
+        message: `No upcoming days found in the menu for the week starting ${week_start_date}.`
       });
     }
 
-    return res.status(200).json(groupedMenu);
+    // ✅ Return the same structure as before, just with updated weekly_limit values
+    res.status(200).json(groupedMenu);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      message: 'Something went wrong.',
-      error: error.message
-    });
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
-
-
 
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
