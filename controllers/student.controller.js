@@ -86,8 +86,8 @@ exports.getWeeklyMenu = async (req, res) => {
 
     userSelections.forEach(selection => {
       // Convert UTC date from DB to IST
-      const mealDateUTC = selection.meal_date; // YYYY-MM-DD
-      const mealDateIST = moment.tz(mealDateUTC + 'T00:00:00', 'UTC')
+      const mealDateUTC = selection.meal_date; // YYYY-MM-DD (UTC)
+      const mealDateIST = moment.utc(mealDateUTC + 'T00:00:00')
         .tz(IST)
         .format('YYYY-MM-DD');
       
@@ -127,11 +127,14 @@ exports.getWeeklyMenu = async (req, res) => {
     }
 
     // -----------------------------
-    // ✅ MAP DAYS TO IST DATES
+    // ✅ MAP DAYS TO IST DATES - CORRECTED
     // -----------------------------
+    // Your WeeklyMenu has day_of_week (like 'monday', 'tuesday', etc.)
+    // We need to map these to actual IST dates for the requested week
+    
     const daysOfWeek = [
       'sunday',
-      'monday',
+      'monday', 
       'tuesday',
       'wednesday',
       'thursday',
@@ -139,13 +142,19 @@ exports.getWeeklyMenu = async (req, res) => {
       'saturday'
     ];
 
-    const dayDateMap = {};
-    const dayDateStrMap = {};
+    // Create mapping from day name to IST date string
+    const dayToDateMap = {};
+    const weekStartDayOfWeek = weekStartMoment.day(); // 0 = Sunday, 1 = Monday, etc.
     
     daysOfWeek.forEach((dayName, index) => {
-      const dayMoment = weekStartMoment.clone().add(index, 'days');
-      dayDateMap[dayName] = dayMoment;
-      dayDateStrMap[dayName] = dayMoment.format('YYYY-MM-DD');
+      // Calculate the date for this day in the requested week
+      let dayOffset = index - weekStartDayOfWeek;
+      if (dayOffset < 0) {
+        dayOffset += 7; // Wrap around to next week
+      }
+      
+      const dayDate = weekStartMoment.clone().add(dayOffset, 'days');
+      dayToDateMap[dayName] = dayDate.format('YYYY-MM-DD');
     });
 
     // -----------------------------
@@ -154,13 +163,13 @@ exports.getWeeklyMenu = async (req, res) => {
     const groupedMenu = {};
 
     for (const item of menu) {
-      const day = item.day_of_week;
+      const day = item.day_of_week.toLowerCase();
       const meal = item.meal_type;
 
-      const dayMoment = dayDateMap[day.toLowerCase()];
-      const dayDateStr = dayDateStrMap[day.toLowerCase()];
+      // Get the actual IST date for this day in the week
+      const dayDateStr = dayToDateMap[day];
       
-      if (!dayMoment) continue;
+      if (!dayDateStr) continue;
 
       // Skip past days (comparison in IST)
       if (dayDateStr < todayIST) continue;
@@ -170,7 +179,7 @@ exports.getWeeklyMenu = async (req, res) => {
 
       const slotKey = `${dayDateStr}-${meal}`;
 
-      // If user already selected this slot
+      // Check if user has already selected this meal slot
       if (userSelectedMealSlots.has(slotKey)) {
         groupedMenu[day][meal].push({});
         continue;
@@ -210,6 +219,9 @@ exports.getWeeklyMenu = async (req, res) => {
     });
   }
 };
+
+
+
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
