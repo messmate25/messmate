@@ -133,6 +133,7 @@ exports.getWeeklyMenu = async (req, res) => {
 
       // ✅ Check if user already selected a meal for this specific day and meal type
       const localDayDate = new Date(dayDate);
+
       localDayDate.setHours(0, 0, 0, 0);
 
       const dateKey = localDayDate.toISOString().split('T')[0];
@@ -141,6 +142,7 @@ exports.getWeeklyMenu = async (req, res) => {
       console.log('MENU SLOT KEY:', slotKey);
 
       if (userSelectedMealSlots.has(slotKey)) {
+        console.log(`User already selected a meal for ${slotKey}, sending empty object in menu.`);
         // User already selected a meal for this slot, send empty object
         groupedMenu[day][meal].push({});
         continue;
