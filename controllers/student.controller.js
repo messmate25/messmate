@@ -2,6 +2,7 @@
 
 const { Op } = require('sequelize');
 const qrcode = require('qrcode');
+const moment = require('moment-timezone');
 
 /**
  * Helper to get initialized models from request
@@ -28,6 +29,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+
 exports.getWeeklyMenu = async (req, res) => {
   try {
     const { WeeklyMenu, MenuItem, WeeklySelection } = getModels(req);
@@ -43,52 +45,56 @@ exports.getWeeklyMenu = async (req, res) => {
     }
 
     // -----------------------------
-    // ✅ PROPER TIMEZONE HANDLING
+    // ✅ SET IST TIMEZONE
     // -----------------------------
-    // Parse the input date in UTC
-    const weekStartUTC = new Date(week_start_date + 'T00:00:00Z');
+    const IST = 'Asia/Kolkata';
+    const todayIST = moment().tz(IST).format('YYYY-MM-DD');
+
+    // -----------------------------
+    // ✅ PARSE INPUT DATE IN IST
+    // -----------------------------
+    const weekStartMoment = moment.tz(week_start_date, 'YYYY-MM-DD', IST);
     
-    if (isNaN(weekStartUTC.getTime())) {
+    if (!weekStartMoment.isValid()) {
       return res.status(400).json({ message: 'Invalid week_start_date format.' });
     }
 
-    // Create weekEnd in UTC
-    const weekEndUTC = new Date(weekStartUTC);
-    weekEndUTC.setDate(weekEndUTC.getDate() + 6);
+    const weekEndMoment = weekStartMoment.clone().add(6, 'days');
 
-    // Format dates as YYYY-MM-DD strings for database queries
-    const formatDateUTC = (date) => {
-      return date.toISOString().split('T')[0];
-    };
-
-    const weekStartStr = formatDateUTC(weekStartUTC);
-    const weekEndStr = formatDateUTC(weekEndUTC);
+    // Convert to UTC strings for database queries
+    const weekStartUTC = weekStartMoment.utc().format('YYYY-MM-DD');
+    const weekEndUTC = weekEndMoment.utc().format('YYYY-MM-DD');
 
     // -----------------------------
-    // ✅ FETCH USER SELECTIONS (using UTC dates)
+    // ✅ FETCH USER SELECTIONS
     // -----------------------------
     const userSelections = await WeeklySelection.findAll({
       where: {
         userId,
         meal_date: {
-          [Op.between]: [weekStartStr, weekEndStr]
+          [Op.between]: [weekStartUTC, weekEndUTC]
         }
       },
       attributes: ['menuItemId', 'meal_date', 'meal_type']
     });
 
     // -----------------------------
-    // ✅ MAP USER SELECTIONS
+    // ✅ MAP USER SELECTIONS (in IST)
     // -----------------------------
     const userSelectedMealSlots = new Map();
     const userSelectionCounts = {};
 
     userSelections.forEach(selection => {
-      const mealDateStr = selection.meal_date; // YYYY-MM-DD (UTC)
+      // Convert UTC date from DB to IST
+      const mealDateUTC = selection.meal_date; // YYYY-MM-DD
+      const mealDateIST = moment.tz(mealDateUTC + 'T00:00:00', 'UTC')
+        .tz(IST)
+        .format('YYYY-MM-DD');
+      
       const mealType = selection.meal_type;
       const menuItemId = selection.menuItemId;
 
-      const slotKey = `${mealDateStr}-${mealType}`;
+      const slotKey = `${mealDateIST}-${mealType}`;
       userSelectedMealSlots.set(slotKey, menuItemId);
 
       userSelectionCounts[menuItemId] = (userSelectionCounts[menuItemId] || 0) + 1;
@@ -98,7 +104,7 @@ exports.getWeeklyMenu = async (req, res) => {
     // ✅ FETCH WEEKLY MENU
     // -----------------------------
     const menu = await WeeklyMenu.findAll({
-      where: { week_start_date: weekStartStr },
+      where: { week_start_date: weekStartUTC },
       include: [{
         model: MenuItem,
         attributes: [
@@ -116,23 +122,12 @@ exports.getWeeklyMenu = async (req, res) => {
 
     if (!menu || menu.length === 0) {
       return res.status(404).json({
-        message: `No menu found for the week starting ${weekStartStr}.`
+        message: `No menu found for the week starting ${weekStartMoment.format('YYYY-MM-DD')}.`
       });
     }
 
     // -----------------------------
-    // ✅ TODAY IN UTC (for consistent comparison)
-    // -----------------------------
-    const nowUTC = new Date();
-    const todayUTC = new Date(Date.UTC(
-      nowUTC.getUTCFullYear(),
-      nowUTC.getUTCMonth(),
-      nowUTC.getUTCDate()
-    ));
-    const todayStr = formatDateUTC(todayUTC);
-
-    // -----------------------------
-    // ✅ MAP DAYS TO UTC DATES
+    // ✅ MAP DAYS TO IST DATES
     // -----------------------------
     const daysOfWeek = [
       'sunday',
@@ -145,13 +140,12 @@ exports.getWeeklyMenu = async (req, res) => {
     ];
 
     const dayDateMap = {};
-    const dayDateStrMap = {}; // Map to store date strings for each day
+    const dayDateStrMap = {};
     
     daysOfWeek.forEach((dayName, index) => {
-      const d = new Date(weekStartUTC);
-      d.setUTCDate(weekStartUTC.getUTCDate() + index);
-      dayDateMap[dayName] = d;
-      dayDateStrMap[dayName] = formatDateUTC(d);
+      const dayMoment = weekStartMoment.clone().add(index, 'days');
+      dayDateMap[dayName] = dayMoment;
+      dayDateStrMap[dayName] = dayMoment.format('YYYY-MM-DD');
     });
 
     // -----------------------------
@@ -163,14 +157,13 @@ exports.getWeeklyMenu = async (req, res) => {
       const day = item.day_of_week;
       const meal = item.meal_type;
 
-      const dayDate = dayDateMap[day.toLowerCase()];
+      const dayMoment = dayDateMap[day.toLowerCase()];
       const dayDateStr = dayDateStrMap[day.toLowerCase()];
       
-      if (!dayDate) continue;
+      if (!dayMoment) continue;
 
-      // Compare UTC dates (not local dates)
-      // Only skip if the entire day has passed in UTC
-      if (dayDateStr < todayStr) continue;
+      // Skip past days (comparison in IST)
+      if (dayDateStr < todayIST) continue;
 
       if (!groupedMenu[day]) groupedMenu[day] = {};
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
@@ -203,7 +196,7 @@ exports.getWeeklyMenu = async (req, res) => {
 
     if (Object.keys(groupedMenu).length === 0) {
       return res.status(404).json({
-        message: `No upcoming days found in the menu for the week starting ${weekStartStr}.`
+        message: `No upcoming days found in the menu for the week starting ${weekStartMoment.format('YYYY-MM-DD')}.`
       });
     }
 
@@ -217,7 +210,6 @@ exports.getWeeklyMenu = async (req, res) => {
     });
   }
 };
-
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
