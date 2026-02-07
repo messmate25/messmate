@@ -4,6 +4,7 @@ const { Sequelize } = require("sequelize");
 const { DefaultAzureCredential } = require("@azure/identity");
 const tedious = require("tedious");
 const { DB_NAME, DB_HOST, AZURE_SQL_SCOPE } = require("./constants");
+const { use } = require("react");
 
 async function createSequelize() {
   try {
@@ -19,6 +20,7 @@ async function createSequelize() {
       dialect: "mssql",
       host: DB_HOST,
       dialectModule: tedious,
+      timezone: "+00:00",
       dialectOptions: {
         authentication: {
           type: "azure-active-directory-access-token",
@@ -28,7 +30,9 @@ async function createSequelize() {
         },
         options: {
           encrypt: true, // Required for Azure SQL
+          useUTC: true,
         },
+
       },
       logging: true, // Disable logging; set true for debugging
     });
