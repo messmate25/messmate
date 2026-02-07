@@ -4,7 +4,6 @@ const { Sequelize } = require("sequelize");
 const { DefaultAzureCredential } = require("@azure/identity");
 const tedious = require("tedious");
 const { DB_NAME, DB_HOST, AZURE_SQL_SCOPE } = require("./constants");
-const { use } = require("react");
 
 async function createSequelize() {
   try {
