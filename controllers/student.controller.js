@@ -67,7 +67,11 @@ exports.getWeeklyMenu = async (req, res) => {
       const mealType = selection.meal_type;
 
       // For checking if slot is already taken
-      const slotKey = `${mealDate}-${mealType}`;
+      const localDate = new Date(mealDate);
+      localDate.setHours(0, 0, 0, 0);
+
+      const dateKey = localDate.toISOString().split('T')[0];
+      const slotKey = `${dateKey}-${mealType}`;
       userSelectedMealSlots.set(slotKey, menuItemId);
 
       // For counting weekly selections per menu item
@@ -118,7 +122,13 @@ exports.getWeeklyMenu = async (req, res) => {
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
 
       // ✅ Check if user already selected a meal for this specific day and meal type
-      const slotKey = `${dayDate.toISOString().split('T')[0]}-${meal}`;
+      const localDayDate = new Date(dayDate);
+      localDayDate.setHours(0, 0, 0, 0);
+
+      const dateKey = localDayDate.toISOString().split('T')[0];
+      const slotKey = `${dateKey}-${meal}`;
+console.log('USER SLOT KEYS:', [...userSelectedMealSlots.keys()]);
+console.log('MENU SLOT KEY:', slotKey);
 
       if (userSelectedMealSlots.has(slotKey)) {
         // User already selected a meal for this slot, send empty object
