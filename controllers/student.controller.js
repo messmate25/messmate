@@ -98,14 +98,24 @@ exports.getWeeklyMenu = async (req, res) => {
 
     // ✅ Calculate the date for each day of the week
     const dayDateMap = {};
-    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const baseDate = new Date(weekStart);
+    baseDate.setHours(0, 0, 0, 0);
 
-    // Map each day_of_week to its actual date
-    daysOfWeek.forEach((day, index) => {
-      const dayDate = new Date(weekStart);
-      dayDate.setDate(weekStart.getDate() + index);
-      dayDateMap[day] = dayDate;
-    });
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
+
+      const dayName = d
+        .toLocaleDateString('en-US', { weekday: 'long' })
+        .toLowerCase();
+
+      dayDateMap[dayName] = d;
+    }
+
+    console.log('DAY DATE MAP:', Object.fromEntries(
+      Object.entries(dayDateMap).map(([k, v]) => [k, v.toISOString().split('T')[0]])
+    ));
+
 
     const groupedMenu = {};
     for (const item of menu) {
@@ -127,8 +137,8 @@ exports.getWeeklyMenu = async (req, res) => {
 
       const dateKey = localDayDate.toISOString().split('T')[0];
       const slotKey = `${dateKey}-${meal}`;
-console.log('USER SLOT KEYS:', [...userSelectedMealSlots.keys()]);
-console.log('MENU SLOT KEY:', slotKey);
+      console.log('USER SLOT KEYS:', [...userSelectedMealSlots.keys()]);
+      console.log('MENU SLOT KEY:', slotKey);
 
       if (userSelectedMealSlots.has(slotKey)) {
         // User already selected a meal for this slot, send empty object
