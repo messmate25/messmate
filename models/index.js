@@ -25,7 +25,7 @@ async function initModels() {
   const Transaction = TransactionModel(sequelize);   // ✅
   const Kitchen = KitchenModel(sequelize);
   // --- Associations ---
-
+  Kitchen.hasMany(weeklyMenu, { foreignKey: 'kitchenId' }); // THIS IS CRITICAL
   // Menu <-> WeeklyMenu
   MenuItem.hasMany(WeeklyMenu, { foreignKey: "menuItemId" });
   WeeklyMenu.belongsTo(MenuItem, { foreignKey: "menuItemId" });
