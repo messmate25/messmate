@@ -47,7 +47,16 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       comment: 'Cost for guests, or for students exceeding their limit'
-    }
+    },
+    // Add this field to the MenuItem model definition
+kitchenId: {
+  type: DataTypes.INTEGER,
+  allowNull: false,
+  references: {
+    model: 'kitchens',
+    key: 'id'
+  }
+}
   }, {
     tableName: 'menu_items',
     timestamps: false

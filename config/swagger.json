@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Mess Management System API",
-    "description": "API for managing mess operations including weekly menus, user management, meal selections, QR code scanning, and guest orders",
-    "version": "1.0.0",
+    "description": "API for managing mess operations including multiple kitchens, weekly menus, user management, meal selections, QR code scanning, and guest orders",
+    "version": "2.0.0",
     "contact": {
       "email": "support@messapp.com"
     }
@@ -14,7 +14,7 @@
       "description": "Development server"
     },
     {
-      "url": "https://messapp-dkfffueseegwexf9.centralindia-01.azurewebsites.net",
+      "url": "https://messapp-dkfffueseegwexf9.centralindia-01.azurewebsites.net/api",
       "description": "Production server"
     }
   ],
@@ -24,12 +24,16 @@
       "description": "User registration, login, and guest authentication"
     },
     {
+      "name": "Kitchens",
+      "description": "Kitchen management operations"
+    },
+    {
       "name": "Admin",
       "description": "Administrative operations for managing the system"
     },
     {
       "name": "Student",
-      "description": "Student-specific operations"
+      "description": "Student-specific operations including kitchen selection"
     },
     {
       "name": "Guest",
@@ -37,7 +41,7 @@
     },
     {
       "name": "Menu",
-      "description": "Menu item management"
+      "description": "Menu item management with kitchen association"
     }
   ],
   "paths": {
@@ -320,6 +324,427 @@
         }
       }
     },
+    "/kitchens": {
+      "get": {
+        "tags": ["Kitchens"],
+        "summary": "Get all kitchens (Admin)",
+        "description": "Retrieve all kitchens with item counts",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Kitchens retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kitchens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KitchenWithStats"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Admin access required"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Kitchens"],
+        "summary": "Create new kitchen (Admin)",
+        "description": "Create a new kitchen",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Main Kitchen"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Primary kitchen serving all major meals"
+                  },
+                  "location": {
+                    "type": "string",
+                    "example": "Building A, Ground Floor"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kitchen created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Kitchen created successfully."
+                    },
+                    "kitchen": {
+                      "$ref": "#/components/schemas/Kitchen"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Kitchen name is required"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Admin access required"
+          },
+          "409": {
+            "description": "Kitchen with this name already exists"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/kitchens/available": {
+      "get": {
+        "tags": ["Kitchens"],
+        "summary": "Get available kitchens (Student)",
+        "description": "Retrieve all active kitchens for student selection",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Kitchens retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kitchens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Kitchen"
+                      }
+                    },
+                    "current_kitchen_id": {
+                      "type": "integer",
+                      "nullable": true,
+                      "example": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/kitchens/select": {
+      "post": {
+        "tags": ["Kitchens"],
+        "summary": "Select default kitchen (Student)",
+        "description": "Set default kitchen for student",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["kitchenId"],
+                "properties": {
+                  "kitchenId": {
+                    "type": "integer",
+                    "example": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default kitchen selected successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Default kitchen selected successfully."
+                    },
+                    "kitchen": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "example": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "example": "Main Kitchen"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Please provide a kitchen ID"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Kitchen not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/kitchens/my-kitchen": {
+      "get": {
+        "tags": ["Kitchens"],
+        "summary": "Get my kitchen (Student)",
+        "description": "Get user's currently selected kitchen",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Kitchen retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kitchen": {
+                      "$ref": "#/components/schemas/Kitchen"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "No default kitchen selected"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/kitchens/{kitchenId}": {
+      "put": {
+        "tags": ["Kitchens"],
+        "summary": "Update kitchen (Admin)",
+        "description": "Update kitchen details",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "kitchenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Updated Kitchen Name"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Updated description"
+                  },
+                  "location": {
+                    "type": "string",
+                    "example": "New Location"
+                  },
+                  "is_active": {
+                    "type": "boolean",
+                    "example": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kitchen updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Kitchen updated successfully."
+                    },
+                    "kitchen": {
+                      "$ref": "#/components/schemas/Kitchen"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Admin access required"
+          },
+          "404": {
+            "description": "Kitchen not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Kitchens"],
+        "summary": "Delete kitchen (Admin)",
+        "description": "Delete a kitchen (only if no menu items exist)",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "kitchenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kitchen deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Admin access required"
+          },
+          "404": {
+            "description": "Kitchen not found"
+          },
+          "409": {
+            "description": "Cannot delete kitchen with existing menu items"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/kitchens/{kitchenId}/stats": {
+      "get": {
+        "tags": ["Kitchens"],
+        "summary": "Get kitchen statistics (Admin)",
+        "description": "Retrieve statistics for a specific kitchen",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "kitchenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kitchen stats retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stats": {
+                      "type": "object",
+                      "properties": {
+                        "total_items": {
+                          "type": "integer",
+                          "example": 15
+                        },
+                        "total_users": {
+                          "type": "integer",
+                          "example": 250
+                        },
+                        "active_menu_entries": {
+                          "type": "integer",
+                          "example": 42
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Admin access required"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/admin/dashboard": {
       "get": {
         "tags": ["Admin"],
@@ -522,7 +947,7 @@
       "get": {
         "tags": ["Admin", "Menu"],
         "summary": "Get all menu items",
-        "description": "Retrieve all menu items (Thalis)",
+        "description": "Retrieve all menu items (Thalis) across all kitchens",
         "security": [{"BearerAuth": []}],
         "responses": {
           "200": {
@@ -554,7 +979,7 @@
       "post": {
         "tags": ["Admin", "Menu"],
         "summary": "Add new menu item",
-        "description": "Create a new menu item (Thali) with image upload",
+        "description": "Create a new menu item (Thali) with image upload and kitchen assignment",
         "security": [{"BearerAuth": []}],
         "requestBody": {
           "required": true,
@@ -562,7 +987,7 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["name", "estimated_prep_time", "monthly_limit", "weekly_limit", "extra_price", "description", "image"],
+                "required": ["name", "estimated_prep_time", "monthly_limit", "weekly_limit", "extra_price", "description", "image", "kitchenId"],
                 "properties": {
                   "name": {
                     "type": "string",
@@ -589,6 +1014,10 @@
                     "type": "string",
                     "example": "Chicken curry with rice and salad"
                   },
+                  "kitchenId": {
+                    "type": "integer",
+                    "example": 1
+                  },
                   "image": {
                     "type": "string",
                     "format": "binary",
@@ -604,7 +1033,55 @@
             "description": "Thali added successfully"
           },
           "400": {
-            "description": "Image file is required"
+            "description": "Image file or kitchenId is required"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Kitchen not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/admin/kitchens/{kitchenId}/menu-items": {
+      "get": {
+        "tags": ["Admin", "Menu"],
+        "summary": "Get menu items by kitchen",
+        "description": "Retrieve all menu items for a specific kitchen",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "kitchenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Menu items retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "menu_items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MenuItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -663,6 +1140,10 @@
                     "type": "number",
                     "format": "float",
                     "example": 60.00
+                  },
+                  "kitchenId": {
+                    "type": "integer",
+                    "example": 1
                   },
                   "image": {
                     "type": "string",
@@ -927,11 +1408,84 @@
         }
       }
     },
+    "/admin/fetchGuestOrders": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get all guests with orders",
+        "description": "Retrieve all guests and their order history",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Guests with orders fetched successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/admin/updateOrderStatus/{orderId}": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Update order status",
+        "description": "Update status of a guest order",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["confirmed", "preparing", "on_the_way", "delivered", "cancelled"],
+                    "example": "preparing"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order status updated successfully"
+          },
+          "400": {
+            "description": "Invalid status"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Order not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/student/profile": {
       "get": {
         "tags": ["Student"],
         "summary": "Get student profile",
-        "description": "Retrieve authenticated student's profile",
+        "description": "Retrieve authenticated student's profile with kitchen preference",
         "security": [{"BearerAuth": []}],
         "responses": {
           "200": {
@@ -956,11 +1510,118 @@
         }
       }
     },
+    "/student/available-kitchens": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "Get available kitchens",
+        "description": "Get all active kitchens for student selection",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Kitchens retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kitchens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Kitchen"
+                      }
+                    },
+                    "current_kitchen_id": {
+                      "type": "integer",
+                      "nullable": true,
+                      "example": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/student/switch-kitchen": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "Switch kitchen",
+        "description": "Change student's selected kitchen",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["kitchenId"],
+                "properties": {
+                  "kitchenId": {
+                    "type": "integer",
+                    "example": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kitchen switched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Kitchen switched successfully."
+                    },
+                    "kitchen": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "example": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "example": "Main Kitchen"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Please provide a kitchen ID"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Kitchen not found or inactive"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/student/weekly-menu": {
       "get": {
         "tags": ["Student", "Menu"],
         "summary": "Get weekly menu for students",
-        "description": "Retrieve weekly menu with upcoming days only",
+        "description": "Retrieve weekly menu filtered by student's selected kitchen",
         "security": [{"BearerAuth": []}],
         "parameters": [
           {
@@ -995,13 +1656,54 @@
             }
           },
           "400": {
-            "description": "Week start date is required"
+            "description": "Week start date is required or kitchen not selected"
           },
           "401": {
             "description": "Unauthorized"
           },
           "404": {
             "description": "No menu found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/student/weekly-selection/preview": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "Preview weekly selection costs",
+        "description": "Preview extra costs for weekly selections",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["selections"],
+                "properties": {
+                  "selections": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SelectionEntry"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview calculated successfully"
+          },
+          "400": {
+            "description": "Please provide selections"
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "500": {
             "description": "Internal server error"
@@ -1167,6 +1869,25 @@
         }
       }
     },
+    "/student/usage-stats": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "Get usage statistics",
+        "description": "Get monthly usage statistics for student",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Usage statistics retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/guest/weekly-menu": {
       "get": {
         "tags": ["Guest", "Menu"],
@@ -1207,6 +1928,40 @@
           },
           "404": {
             "description": "No menu found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/guest/menu-items": {
+      "get": {
+        "tags": ["Guest", "Menu"],
+        "summary": "Get menu items for guests",
+        "description": "Retrieve all menu items available for ordering",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Menu items retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "menu_items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MenuItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "500": {
             "description": "Internal server error"
@@ -1284,33 +2039,47 @@
         }
       }
     },
-    "/guest/menu-items": {
-      "get": {
-        "tags": ["Guest", "Menu"],
-        "summary": "Get menu items for guests",
-        "description": "Retrieve all menu items available for ordering",
+    "/auth/update-password": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Update user password",
+        "description": "Update authenticated user's password",
         "security": [{"BearerAuth": []}],
-        "responses": {
-          "200": {
-            "description": "Menu items retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "menu_items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/MenuItem"
-                      }
-                    }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["oldPassword", "newPassword"],
+                "properties": {
+                  "oldPassword": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "oldpassword123"
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "newpassword123"
                   }
                 }
               }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated successfully"
+          },
+          "400": {
+            "description": "Old password is incorrect"
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "404": {
+            "description": "User not found"
           },
           "500": {
             "description": "Internal server error"
@@ -1321,6 +2090,53 @@
   },
   "components": {
     "schemas": {
+      "Kitchen": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Main Kitchen"
+          },
+          "description": {
+            "type": "string",
+            "example": "Primary kitchen serving all major meals"
+          },
+          "location": {
+            "type": "string",
+            "example": "Building A, Ground Floor"
+          },
+          "is_active": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "KitchenWithStats": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Kitchen" },
+          {
+            "type": "object",
+            "properties": {
+              "item_count": {
+                "type": "integer",
+                "example": 15
+              }
+            }
+          }
+        ]
+      },
       "User": {
         "type": "object",
         "properties": {
@@ -1350,6 +2166,14 @@
             "type": "number",
             "format": "float",
             "example": 500.00
+          },
+          "kitchenId": {
+            "type": "integer",
+            "nullable": true,
+            "example": 1
+          },
+          "Kitchen": {
+            "$ref": "#/components/schemas/Kitchen"
           }
         }
       },
@@ -1419,6 +2243,10 @@
             "type": "number",
             "format": "float",
             "example": 50.00
+          },
+          "kitchenId": {
+            "type": "integer",
+            "example": 1
           }
         }
       },
@@ -1459,6 +2287,10 @@
           "imageUrl": {
             "type": "string",
             "example": "https://storage.blob.core.windows.net/image/123456789_image.jpg"
+          },
+          "kitchenId": {
+            "type": "integer",
+            "example": 1
           }
         }
       },

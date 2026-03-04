@@ -28,7 +28,7 @@
   app.use("/api/student", studentRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/guest", guestRoutes);
-
+  app.use('/api/kitchens', require('./routes/kitchen.routes'));
   // --- Swagger Docs ---
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

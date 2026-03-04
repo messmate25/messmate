@@ -57,4 +57,10 @@ router.delete("/users/:userId", protectedAdminRoute, adminController.deleteUser)
 router.post('/recharge', protectedAdminRoute, adminController.updateWalletBalance);
 router.get("/fetchGuestOrders", protectedAdminRoute, adminController.getAllGuestsWithOrders); 
 router.post("/updateOrderStatus/:orderId", protectedAdminRoute, adminController.updateOrderStatus);
+router.get('/available-kitchens-admin', protectedAdminRoute ,  adminController.getAvailableKitchens);
+
+// Update these routes to include kitchenId
+
+// Add new route to get items by kitchen
+router.get("/kitchens/:kitchenId/menu-items", protectedAdminRoute, adminController.getMenuItemsByKitchen);
 module.exports = router;

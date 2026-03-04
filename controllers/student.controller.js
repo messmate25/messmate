@@ -30,9 +30,18 @@ exports.getProfile = async (req, res) => {
 
 exports.getWeeklyMenu = async (req, res) => {
   try {
-    const { WeeklyMenu, MenuItem, WeeklySelection } = getModels(req);
+    const { WeeklyMenu, MenuItem, WeeklySelection , User } = getModels(req);
     const { week_start_date } = req.query;
     const userId = req.user?.id; // Get user ID from auth middleware
+
+
+    const user = await User.findByPk(userId);
+    if (!user.kitchenId) {
+      return res.status(400).json({
+        message: 'Please select a kitchen first.',
+        requires_kitchen_selection: true
+      });
+    }
 
     if (!week_start_date) {
       return res.status(400).json({ message: 'Please provide a week_start_date.' });
@@ -83,6 +92,7 @@ exports.getWeeklyMenu = async (req, res) => {
       where: { week_start_date },
       include: [{
         model: MenuItem,
+        where: { kitchenId: user.kitchenId }, // Filter by kitchen
         attributes: ['id', 'name', 'description', 'image_url', 'extra_price', 'weekly_limit', 'monthly_limit']
       }],
       order: [['day_of_week'], ['meal_type']]
@@ -591,5 +601,66 @@ exports.getWeeklySelections = async (req, res) => {
   } catch (err) {
     console.error("getWeeklySelections error:", err);
     return res.status(500).json({ error: "Failed to fetch weekly selections", details: err.message });
+  }
+};
+
+
+exports.getAvailableKitchens = async (req, res) => {
+  try {
+    const { Kitchen } = getModels(req);
+
+    const kitchens = await Kitchen.findAll({
+      where: { is_active: true },
+      attributes: ['id', 'name', 'description', 'location']
+    });
+
+    // Get user's current kitchen if any
+    const { User } = getModels(req);
+    const user = await User.findByPk(req.user.id);
+
+    res.status(200).json({
+      kitchens,
+      current_kitchen_id: user.kitchenId || null
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};
+
+// Switch kitchen
+exports.switchKitchen = async (req, res) => {
+  try {
+    const { kitchenId } = req.body;
+    const { User, Kitchen } = getModels(req);
+    const userId = req.user.id;
+
+    if (!kitchenId) {
+      return res.status(400).json({ message: 'Please provide a kitchen ID.' });
+    }
+
+    // Check if kitchen exists and is active
+    const kitchen = await Kitchen.findOne({
+      where: { id: kitchenId, is_active: true }
+    });
+
+    if (!kitchen) {
+      return res.status(404).json({ message: 'Kitchen not found or inactive.' });
+    }
+
+    // Update user's kitchen preference
+    await User.update(
+      { kitchenId },
+      { where: { id: userId } }
+    );
+
+    res.status(200).json({
+      message: 'Kitchen switched successfully.',
+      kitchen: {
+        id: kitchen.id,
+        name: kitchen.name
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };

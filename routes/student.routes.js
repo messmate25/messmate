@@ -31,5 +31,11 @@ router.get('/meal-qr', studentController.generateMealQR);
 // GET /api/student/usage-stats
 router.get('/usage-stats', studentController.getUsageStats);
 
+// Add these new routes
+// GET /api/student/available-kitchens
+router.get('/available-kitchens', studentController.getAvailableKitchens);
+
+// POST /api/student/switch-kitchen
+router.post('/switch-kitchen', studentController.switchKitchen);
 
 module.exports = router;

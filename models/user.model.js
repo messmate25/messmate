@@ -39,7 +39,15 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       defaultValue: 0.00
-    }
+    },
+kitchenId: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+  references: {
+    model: 'kitchens',
+    key: 'id'
+  }
+}
   }, {
     tableName: 'users',
     timestamps: true
