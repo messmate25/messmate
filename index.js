@@ -12,7 +12,7 @@
   const studentRoutes = require("./routes/student.routes");
   const adminRoutes = require("./routes/admin.routes");
   const guestRoutes = require("./routes/guest.routes");
-
+  const kitchenRoutes = require("./routes/kitchen.routes");
   const swaggerUi = require('swagger-ui-express');
   const swaggerSpec = require('./config/swagger.json');
 
@@ -28,7 +28,7 @@
   app.use("/api/student", studentRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/guest", guestRoutes);
-  app.use('/api/kitchens', require('./routes/kitchen.routes'));
+  app.use('/api/kitchens', kitchenRoutes);
   // --- Swagger Docs ---
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -41,9 +41,9 @@
   (async () => {
     try {
 
-      const { sequelize  , User, Guest, MenuItem, WeeklyMenu, WeeklySelection, MealHistory, GuestOrder , GuestOrderItem} = await initModels();
+      const { sequelize  , User, Guest, MenuItem, WeeklyMenu, WeeklySelection, MealHistory, GuestOrder , GuestOrderItem, Kitchen} = await initModels();
 
-      app.locals.models = { User, Guest , MenuItem, WeeklyMenu, WeeklySelection, MealHistory , GuestOrder , GuestOrderItem};
+      app.locals.models = { User, Guest , MenuItem, WeeklyMenu, WeeklySelection, MealHistory , GuestOrder , GuestOrderItem, Kitchen};
 
       await sequelize.authenticate();
       console.log("✅ Database connected successfully.");
