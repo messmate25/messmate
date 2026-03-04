@@ -753,8 +753,7 @@ exports.getAvailableKitchens = async (req, res) => {
     const { Kitchen } = getModels(req);
 
     const kitchens = await Kitchen.findAll({
-      where: { is_active: true },
-      attributes: ['id', 'name', 'description', 'location']
+      attributes: ['id', 'name', 'description', 'location' , 'is_active']
     });
 
     // Get user's current kitchen if any
