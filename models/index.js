@@ -25,7 +25,7 @@ async function initModels() {
   const Transaction = TransactionModel(sequelize);   // ✅
   const Kitchen = KitchenModel(sequelize);
   // --- Associations ---
-  Kitchen.hasMany(WeeklyMenu, { foreignKey: 'kitchenId' }); // THIS IS CRITICAL
+
   // Menu <-> WeeklyMenu
   MenuItem.hasMany(WeeklyMenu, { foreignKey: "menuItemId" });
   WeeklyMenu.belongsTo(MenuItem, { foreignKey: "menuItemId" });
@@ -35,7 +35,8 @@ async function initModels() {
   WeeklySelection.belongsTo(User, { foreignKey: "userId" });
   MenuItem.hasMany(WeeklySelection, { foreignKey: "menuItemId" });
   WeeklySelection.belongsTo(MenuItem, { foreignKey: "menuItemId" });
-  
+  // Add this with your other associations
+
   // User/Guest <-> MealHistory
   GuestOrderItem.belongsTo(MenuItem, { foreignKey: "menu_item_id", as: "menuItem" });
   MenuItem.hasMany(GuestOrderItem, { foreignKey: "menu_item_id", as: "orderItems" });

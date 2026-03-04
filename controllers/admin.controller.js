@@ -166,13 +166,15 @@ exports.setWeeklyMenu = async (req, res) => {
 // UPDATE: getWeeklyMenus to filter by kitchen
 exports.getWeeklyMenus = async (req, res) => {
   try {
-    const { week_number, start_date, kitchenId } = req.query; // Add kitchenId
-    const { WeeklyMenu, MenuItem, Kitchen } = getModels(req);
+    const { week_number, start_date, kitchenId } = req.query;
+    const { WeeklyMenu, MenuItem, Kitchen, sequelize } = getModels(req);
 
     let whereClause = {};
+    let kitchenWhereClause = {};
     
     if (kitchenId) {
       whereClause.kitchenId = kitchenId;
+      kitchenWhereClause.id = kitchenId;
     }
 
     if (week_number && start_date) {
@@ -183,41 +185,78 @@ exports.getWeeklyMenus = async (req, res) => {
       whereClause.week_start_date = targetWeek;
     }
 
+    // Get all weekly menus
     const menus = await WeeklyMenu.findAll({
       where: whereClause,
-      include: [
-        { 
-          model: MenuItem, 
-          attributes: ['name', 'description', 'image_url', 'kitchenId'] 
-        },
-        {
-          model: Kitchen,
-          attributes: ['name', 'location']
-        }
-      ],
       order: [['week_start_date', 'ASC'], ['day_of_week', 'ASC'], ['meal_type', 'ASC']]
     });
 
-    // Map to include kitchen info
-    const response = menus.map(m => ({
-      id: m.id,
-      week_start_date: m.week_start_date,
-      day_of_week: m.day_of_week,
-      meal_type: m.meal_type,
-      menuItemId: m.menuItemId,
-      name: m.MenuItem?.name || '',
-      description: m.MenuItem?.description || '',
-      imageUrl: m.MenuItem?.image_url || '',
-      kitchenId: m.kitchenId,
-      kitchenName: m.Kitchen?.name || ''
-    }));
+    if (!menus || menus.length === 0) {
+      return res.status(200).json({ menus: [] });
+    }
+
+    // Get all unique menuItemIds from the menus
+    const menuItemIds = [...new Set(menus.map(m => m.menuItemId))];
+    
+    // Get all menu items
+    const menuItems = await MenuItem.findAll({
+      where: { id: menuItemIds },
+      attributes: ['id', 'name', 'description', 'image_url', 'kitchenId']
+    });
+
+    // Create a map of menu items for easy lookup
+    const menuItemMap = {};
+    menuItems.forEach(item => {
+      menuItemMap[item.id] = item;
+    });
+
+    // Get all unique kitchenIds from menus and menu items
+    const kitchenIds = [
+      ...new Set([
+        ...menus.map(m => m.kitchenId),
+        ...menuItems.map(item => item.kitchenId)
+      ].filter(id => id)) // Remove null/undefined
+    ];
+
+    // Get kitchen information if there are any kitchenIds
+    let kitchenMap = {};
+    if (kitchenIds.length > 0) {
+      const kitchens = await Kitchen.findAll({
+        where: { id: kitchenIds },
+        attributes: ['id', 'name', 'location']
+      });
+      
+      kitchens.forEach(kitchen => {
+        kitchenMap[kitchen.id] = kitchen;
+      });
+    }
+
+    // Map the response
+    const response = menus.map(m => {
+      const menuItem = menuItemMap[m.menuItemId] || {};
+      const kitchen = kitchenMap[m.kitchenId] || kitchenMap[menuItem.kitchenId] || {};
+      
+      return {
+        id: m.id,
+        week_start_date: m.week_start_date,
+        day_of_week: m.day_of_week,
+        meal_type: m.meal_type,
+        menuItemId: m.menuItemId,
+        name: menuItem.name || '',
+        description: menuItem.description || '',
+        imageUrl: menuItem.image_url || '',
+        kitchenId: m.kitchenId || menuItem.kitchenId || null,
+        kitchenName: kitchen.name || 'Unknown Kitchen',
+        kitchenLocation: kitchen.location || ''
+      };
+    });
 
     res.status(200).json({ menus: response });
   } catch (error) {
+    console.error('Error in getWeeklyMenus:', error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
-
 // UPDATE: deleteWeeklyMenu to include kitchen context
 exports.deleteWeeklyMenu = async (req, res) => {
   try {
