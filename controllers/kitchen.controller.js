@@ -1,115 +1,225 @@
-// Update addMenuItem to include kitchenId
-exports.addMenuItem = async (req, res) => {
-  try {
-    const { MenuItem } = getModels(req);
-    const { name, estimated_prep_time, monthly_limit, weekly_limit, extra_price, description, kitchenId } = req.body;
+const { Op } = require('sequelize');
 
-    if (!req.file) {
-      return res.status(400).json({ message: "Image file is required." });
+const getModels = (req) => req.app.locals.models;
+
+
+// Get all available kitchens
+exports.getAvailableKitchens = async (req, res) => {
+    try {
+        const { Kitchen } = getModels(req);
+
+        const kitchens = await Kitchen.findAll({
+            where: { is_active: true },
+            attributes: ['id', 'name', 'description', 'location'],
+            order: [['name', 'ASC']]
+        });
+
+        res.status(200).json({ kitchens });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
     }
-
-    if (!kitchenId) {
-      return res.status(400).json({ message: "Kitchen ID is required." });
-    }
-
-    // Check if kitchen exists
-    const { Kitchen } = getModels(req);
-    const kitchen = await Kitchen.findByPk(kitchenId);
-    if (!kitchen) {
-      return res.status(404).json({ message: "Kitchen not found." });
-    }
-
-    // Upload to Azure
-    const blobName = `${Date.now()}_${req.file.originalname}`;
-    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-
-    await blockBlobClient.uploadData(req.file.buffer, {
-      blobHTTPHeaders: { blobContentType: req.file.mimetype },
-    });
-
-    const imageUrl = blockBlobClient.url;
-
-    // Save to DB with kitchenId
-    const newItem = await MenuItem.create({
-      name,
-      estimated_prep_time,
-      monthly_limit,
-      weekly_limit,
-      extra_price,
-      description,
-      image_url: imageUrl,
-      kitchenId
-    });
-
-    res.status(201).json({
-      message: "Thali added successfully!",
-      item: newItem,
-    });
-  } catch (error) {
-    console.error("Azure Upload Error:", error);
-    res.status(500).json({ message: "Something went wrong.", error: error.message });
-  }
 };
 
-// Add new function to get menu items by kitchen
-exports.getMenuItemsByKitchen = async (req, res) => {
-  try {
-    const { kitchenId } = req.params;
-    const { MenuItem } = getModels(req);
+exports.selectDefaultKitchen = async (req, res) => {
+    try {
+        const { User } = getModels(req);
+        const { kitchenId } = req.body;
+        const userId = req.user.id;
 
-    const items = await MenuItem.findAll({
-      where: { kitchenId },
-      attributes: [
-        'id',
-        'name',
-        'description',
-        'image_url',
-        'estimated_prep_time',
-        'monthly_limit',
-        'weekly_limit',
-        'extra_price',
-        'kitchenId'
-      ],
-      order: [['name', 'ASC']]
-    });
+        if (!kitchenId) {
+            return res.status(400).json({ message: 'Please provide a kitchen ID.' });
+        }
 
-    res.status(200).json({ menu_items: items });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Something went wrong while fetching menu items.',
-      error: error.message
-    });
-  }
+        // Check if kitchen exists
+        const { Kitchen } = getModels(req);
+        const kitchen = await Kitchen.findByPk(kitchenId);
+
+        if (!kitchen) {
+            return res.status(404).json({ message: 'Kitchen not found.' });
+        }
+
+        // Update user's default kitchen
+        await User.update(
+            { kitchenId },
+            { where: { id: userId } }
+        );
+
+        res.status(200).json({
+            message: 'Default kitchen selected successfully.',
+            kitchen: {
+                id: kitchen.id,
+                name: kitchen.name
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    }
 };
 
-// Update setWeeklyMenu to validate kitchen
-exports.setWeeklyMenu = async (req, res) => {
-  try {
-    const { week_start_date, menu } = req.body; // menu should include kitchenId in each entry
-    const { WeeklyMenu, MenuItem } = getModels(req);
+// Get user's current kitchen
+exports.getMyKitchen = async (req, res) => {
+    try {
+        const { User, Kitchen } = getModels(req);
+        const userId = req.user.id;
 
-    if (!week_start_date || !menu) {
-      return res.status(400).json({ message: 'Week start date and menu are required.' });
+        const user = await User.findByPk(userId, {
+            include: [{
+                model: Kitchen,
+                attributes: ['id', 'name', 'description', 'location']
+            }]
+        });
+
+        if (!user || !user.Kitchen) {
+            return res.status(404).json({ message: 'No default kitchen selected.' });
+        }
+
+        res.status(200).json({ kitchen: user.Kitchen });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
     }
+};
 
-    // Validate that all menu items belong to the same kitchen or track per item
-    // You might want to store kitchenId in WeeklyMenu as well, or validate per item
+// --- Admin Functions ---
 
-    // Clear existing menu for that week
-    await WeeklyMenu.destroy({ where: { week_start_date } });
+// Create new kitchen
+exports.createKitchen = async (req, res) => {
+    try {
+        const { Kitchen } = getModels(req);
+        const { name, description, location } = req.body;
 
-    const menuEntries = menu.map(entry => ({
-      week_start_date,
-      day_of_week: entry.day_of_week,
-      meal_type: entry.meal_type,
-      menuItemId: entry.menuItemId
-      // Note: kitchenId is derived from menuItemId
-    }));
+        if (!name) {
+            return res.status(400).json({ message: 'Kitchen name is required.' });
+        }
 
-    await WeeklyMenu.bulkCreate(menuEntries);
+        const existingKitchen = await Kitchen.findOne({ where: { name } });
+        if (existingKitchen) {
+            return res.status(409).json({ message: 'Kitchen with this name already exists.' });
+        }
 
-    res.status(201).json({ message: `Menu for the week of ${week_start_date} has been set.` });
-  } catch (error) {
-    res.status(500).json({ message: 'Something went wrong.', error: error.message });
-  }
+        const kitchen = await Kitchen.create({
+            name,
+            description,
+            location,
+            is_active: true
+        });
+
+        res.status(201).json({
+            message: 'Kitchen created successfully.',
+            kitchen
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    }
+};
+
+// Update kitchen
+exports.updateKitchen = async (req, res) => {
+    try {
+        const { Kitchen } = getModels(req);
+        const { kitchenId } = req.params;
+        const { name, description, location, is_active } = req.body;
+
+        const kitchen = await Kitchen.findByPk(kitchenId);
+        if (!kitchen) {
+            return res.status(404).json({ message: 'Kitchen not found.' });
+        }
+
+        await kitchen.update({
+            name: name || kitchen.name,
+            description: description !== undefined ? description : kitchen.description,
+            location: location !== undefined ? location : kitchen.location,
+            is_active: is_active !== undefined ? is_active : kitchen.is_active
+        });
+
+        res.status(200).json({
+            message: 'Kitchen updated successfully.',
+            kitchen
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    }
+};
+
+// Delete kitchen
+exports.deleteKitchen = async (req, res) => {
+    try {
+        const { Kitchen, MenuItem } = getModels(req);
+        const { kitchenId } = req.params;
+
+        // Check if kitchen has any menu items
+        const itemCount = await MenuItem.count({ where: { kitchenId } });
+
+        if (itemCount > 0) {
+            return res.status(409).json({
+                message: 'Cannot delete kitchen with existing menu items. Please reassign or delete items first.'
+            });
+        }
+
+        const kitchen = await Kitchen.findByPk(kitchenId);
+        if (!kitchen) {
+            return res.status(404).json({ message: 'Kitchen not found.' });
+        }
+
+        await kitchen.destroy();
+
+        res.status(200).json({ message: 'Kitchen deleted successfully.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    }
+};
+
+// Get all kitchens (admin)
+exports.getAllKitchens = async (req, res) => {
+    try {
+        const { Kitchen, MenuItem } = getModels(req);
+
+        const kitchens = await Kitchen.findAll({
+            include: [{
+                model: MenuItem,
+                attributes: ['id'],
+                required: false
+            }],
+            order: [['name', 'ASC']]
+        });
+
+        // Add item count to each kitchen
+        const kitchensWithStats = kitchens.map(kitchen => ({
+            ...kitchen.toJSON(),
+            item_count: kitchen.MenuItems ? kitchen.MenuItems.length : 0
+        }));
+
+        res.status(200).json({ kitchens: kitchensWithStats });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    }
+};
+
+// Get kitchen stats
+exports.getKitchenStats = async (req, res) => {
+    try {
+        const { kitchenId } = req.params;
+        const { MenuItem, WeeklyMenu, User } = getModels(req);
+
+        const itemCount = await MenuItem.count({ where: { kitchenId } });
+
+        const userCount = await User.count({ where: { kitchenId } });
+
+        const activeMenuCount = await WeeklyMenu.count({
+            include: [{
+                model: MenuItem,
+                where: { kitchenId },
+                required: true
+            }]
+        });
+
+        res.status(200).json({
+            stats: {
+                total_items: itemCount,
+                total_users: userCount,
+                active_menu_entries: activeMenuCount
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Something went wrong.', error: error.message });
+    }
 };
