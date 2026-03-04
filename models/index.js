@@ -50,7 +50,7 @@ async function initModels() {
   return {
     sequelize,
     User, Guest,
-    MenuItem, WeeklyMenu, WeeklySelection, GuestOrder, KitchenModel,        // ✅ returning new model
+    MenuItem, WeeklyMenu, WeeklySelection, GuestOrder, Kitchen : KitchenModel,        // ✅ returning new model
     GuestOrderItem,   
     MealHistory, Transaction   // ✅ include new model
   };

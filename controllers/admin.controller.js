@@ -32,8 +32,8 @@ exports.addMenuItem = async (req, res) => {
     }
 
     // Check if kitchen exists
-    const { KitchenModel } = getModels(req);
-    const kitchen = await KitchenModel.findByPk(kitchenId);
+    const { Kitchen } = getModels(req);
+    const kitchen = await Kitchen.findByPk(kitchenId);
     if (!kitchen) {
       return res.status(404).json({ message: "Kitchen not found." });
     }
@@ -314,8 +314,8 @@ exports.addMenuItem = async (req, res) => {
     }
 
     // Check if kitchen exists
-    const { KitchenModel } = getModels(req);
-    const kitchen = await KitchenModel.findByPk(kitchenId);
+    const { Kitchen } = getModels(req);
+    const kitchen = await Kitchen.findByPk(kitchenId);
     if (!kitchen) {
       return res.status(404).json({ message: "Kitchen not found." });
     }
@@ -750,9 +750,9 @@ exports.updateOrderStatus = async (req, res) => {
 
 exports.getAvailableKitchens = async (req, res) => {
   try {
-    const { KitchenModel } = getModels(req);
+    const { Kitchen } = getModels(req);
 
-    const kitchens = await KitchenModel.findAll({
+    const kitchens = await Kitchen.findAll({
       where: { is_active: true },
       attributes: ['id', 'name', 'description', 'location']
     });

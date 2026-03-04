@@ -607,9 +607,9 @@ exports.getWeeklySelections = async (req, res) => {
 
 exports.getAvailableKitchens = async (req, res) => {
   try {
-    const { KitchenModel } = getModels(req);
+    const { Kitchen } = getModels(req);
 
-    const kitchens = await KitchenModel.findAll({
+    const kitchens = await Kitchen.findAll({
       where: { is_active: true },
       attributes: ['id', 'name', 'description', 'location']
     });
@@ -631,7 +631,7 @@ exports.getAvailableKitchens = async (req, res) => {
 exports.switchKitchen = async (req, res) => {
   try {
     const { kitchenId } = req.body;
-    const { User, KitchenModel } = getModels(req);
+    const { User, Kitchen } = getModels(req);
     const userId = req.user.id;
 
     if (!kitchenId) {
@@ -639,7 +639,7 @@ exports.switchKitchen = async (req, res) => {
     }
 
     // Check if kitchen exists and is active
-    const kitchen = await KitchenModel.findOne({
+    const kitchen = await Kitchen.findOne({
       where: { id: kitchenId, is_active: true }
     });
 

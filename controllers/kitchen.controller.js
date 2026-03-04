@@ -6,9 +6,9 @@ const getModels = (req) => req.app.locals.models;
 // Get all available kitchens
 exports.getAvailableKitchens = async (req, res) => {
     try {
-        const { KitchenModel } = getModels(req);
+        const { Kitchen } = getModels(req);
 
-        const kitchens = await KitchenModel.findAll({
+        const kitchens = await Kitchen.findAll({
             where: { is_active: true },
             attributes: ['id', 'name', 'description', 'location'],
             order: [['name', 'ASC']]
@@ -31,8 +31,8 @@ exports.selectDefaultKitchen = async (req, res) => {
         }
 
         // Check if kitchen exists
-        const { KitchenModel } = getModels(req);
-        const kitchen = await KitchenModel.findByPk(kitchenId);
+        const { Kitchen } = getModels(req);
+        const kitchen = await Kitchen.findByPk(kitchenId);
 
         if (!kitchen) {
             return res.status(404).json({ message: 'Kitchen not found.' });
@@ -59,12 +59,12 @@ exports.selectDefaultKitchen = async (req, res) => {
 // Get user's current kitchen
 exports.getMyKitchen = async (req, res) => {
     try {
-        const { User, KitchenModel } = getModels(req);
+        const { User, Kitchen } = getModels(req);
         const userId = req.user.id;
 
         const user = await User.findByPk(userId, {
             include: [{
-                model: KitchenModel,
+                model: Kitchen,
                 attributes: ['id', 'name', 'description', 'location']
             }]
         });
@@ -84,19 +84,19 @@ exports.getMyKitchen = async (req, res) => {
 // Create new kitchen
 exports.createKitchen = async (req, res) => {
     try {
-        const { KitchenModel } = getModels(req);
+        const { Kitchen } = getModels(req);
         const { name, description, location } = req.body;
 
         if (!name) {
             return res.status(400).json({ message: 'Kitchen name is required.' });
         }
 
-        const existingKitchen = await KitchenModel.findOne({ where: { name } });
+        const existingKitchen = await Kitchen.findOne({ where: { name } });
         if (existingKitchen) {
             return res.status(409).json({ message: 'Kitchen with this name already exists.' });
         }
 
-        const kitchen = await KitchenModel.create({
+        const kitchen = await Kitchen.create({
             name,
             description,
             location,
@@ -115,11 +115,11 @@ exports.createKitchen = async (req, res) => {
 // Update kitchen
 exports.updateKitchen = async (req, res) => {
     try {
-        const { KitchenModel } = getModels(req);
+        const { Kitchen } = getModels(req);
         const { kitchenId } = req.params;
         const { name, description, location, is_active } = req.body;
 
-        const kitchen = await KitchenModel.findByPk(kitchenId);
+        const kitchen = await Kitchen.findByPk(kitchenId);
         if (!kitchen) {
             return res.status(404).json({ message: 'Kitchen not found.' });
         }
@@ -143,7 +143,7 @@ exports.updateKitchen = async (req, res) => {
 // Delete kitchen
 exports.deleteKitchen = async (req, res) => {
     try {
-        const { KitchenModel, MenuItem } = getModels(req);
+        const { Kitchen, MenuItem } = getModels(req);
         const { kitchenId } = req.params;
 
         // Check if kitchen has any menu items
@@ -155,7 +155,7 @@ exports.deleteKitchen = async (req, res) => {
             });
         }
 
-        const kitchen = await KitchenModel.findByPk(kitchenId);
+        const kitchen = await Kitchen.findByPk(kitchenId);
         if (!kitchen) {
             return res.status(404).json({ message: 'Kitchen not found.' });
         }
@@ -171,9 +171,9 @@ exports.deleteKitchen = async (req, res) => {
 // Get all kitchens (admin)
 exports.getAllKitchens = async (req, res) => {
     try {
-        const { KitchenModel, MenuItem } = getModels(req);
+        const { Kitchen, MenuItem } = getModels(req);
 
-        const kitchens = await KitchenModel.findAll({
+        const kitchens = await Kitchen.findAll({
             include: [{
                 model: MenuItem,
                 attributes: ['id'],
