@@ -223,3 +223,100 @@ exports.getKitchenStats = async (req, res) => {
         res.status(500).json({ message: 'Something went wrong.', error: error.message });
     }
 };
+
+
+// Add these functions to the existing kitchen.controller.js
+
+// Get weekly menu for a specific kitchen
+exports.getKitchenWeeklyMenu = async (req, res) => {
+  try {
+    const { kitchenId } = req.params;
+    const { week_start_date } = req.query;
+    const { WeeklyMenu, MenuItem, Kitchen } = getModels(req);
+
+    if (!week_start_date) {
+      return res.status(400).json({ message: 'Please provide week_start_date.' });
+    }
+
+    const kitchen = await Kitchen.findByPk(kitchenId);
+    if (!kitchen) {
+      return res.status(404).json({ message: 'Kitchen not found.' });
+    }
+
+    const menu = await WeeklyMenu.findAll({
+      where: { 
+        kitchenId,
+        week_start_date 
+      },
+      include: [{
+        model: MenuItem,
+        attributes: ['id', 'name', 'description', 'image_url', 'extra_price', 'weekly_limit', 'monthly_limit']
+      }],
+      order: [['day_of_week'], ['meal_type']]
+    });
+
+    const groupedMenu = {};
+    menu.forEach(item => {
+      const day = item.day_of_week;
+      const meal = item.meal_type;
+      
+      if (!groupedMenu[day]) groupedMenu[day] = {};
+      if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
+      
+      groupedMenu[day][meal].push(item.MenuItem);
+    });
+
+    res.status(200).json({
+      kitchen: {
+        id: kitchen.id,
+        name: kitchen.name
+      },
+      week_start_date,
+      menu: groupedMenu
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};
+
+// Get all weekly menus for a kitchen
+exports.getAllKitchenWeeklyMenus = async (req, res) => {
+  try {
+    const { kitchenId } = req.params;
+    const { WeeklyMenu, MenuItem, Kitchen } = getModels(req);
+
+    const kitchen = await Kitchen.findByPk(kitchenId);
+    if (!kitchen) {
+      return res.status(404).json({ message: 'Kitchen not found.' });
+    }
+
+    const menus = await WeeklyMenu.findAll({
+      where: { kitchenId },
+      include: [{
+        model: MenuItem,
+        attributes: ['id', 'name']
+      }],
+      order: [['week_start_date', 'DESC'], ['day_of_week'], ['meal_type']]
+    });
+
+    // Group by week
+    const groupedByWeek = {};
+    menus.forEach(menu => {
+      const week = menu.week_start_date;
+      if (!groupedByWeek[week]) {
+        groupedByWeek[week] = [];
+      }
+      groupedByWeek[week].push(menu);
+    });
+
+    res.status(200).json({
+      kitchen: {
+        id: kitchen.id,
+        name: kitchen.name
+      },
+      weekly_menus: groupedByWeek
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+};

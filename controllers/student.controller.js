@@ -28,20 +28,12 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+// UPDATE: getWeeklyMenu to use user's kitchen preference
 exports.getWeeklyMenu = async (req, res) => {
   try {
-    const { WeeklyMenu, MenuItem, WeeklySelection , User } = getModels(req);
+    const { WeeklyMenu, MenuItem, WeeklySelection, User } = getModels(req);
     const { week_start_date } = req.query;
-    const userId = req.user?.id; // Get user ID from auth middleware
-
-
-    const user = await User.findByPk(userId);
-    if (!user.kitchenId) {
-      return res.status(400).json({
-        message: 'Please select a kitchen first.',
-        requires_kitchen_selection: true
-      });
-    }
+    const userId = req.user?.id;
 
     if (!week_start_date) {
       return res.status(400).json({ message: 'Please provide a week_start_date.' });
@@ -51,11 +43,21 @@ exports.getWeeklyMenu = async (req, res) => {
       return res.status(401).json({ message: 'User authentication required.' });
     }
 
+    // Get user's selected kitchen
+    const user = await User.findByPk(userId);
+    
+    if (!user.kitchenId) {
+      return res.status(400).json({ 
+        message: 'Please select a kitchen first.',
+        requires_kitchen_selection: true 
+      });
+    }
+
     const weekStart = new Date(week_start_date);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    // ✅ Get user's existing selections for this week WITH meal_date and meal_type
+    // Get user's existing selections for this week
     const userSelections = await WeeklySelection.findAll({
       where: {
         userId,
@@ -66,7 +68,7 @@ exports.getWeeklyMenu = async (req, res) => {
       attributes: ['menuItemId', 'meal_date', 'meal_type']
     });
 
-    // ✅ Create a map to check if user already selected a meal for specific day and meal type
+    // Create maps for user selections
     const userSelectedMealSlots = new Map();
     const userSelectionCounts = {};
 
@@ -75,38 +77,40 @@ exports.getWeeklyMenu = async (req, res) => {
       const mealDate = selection.meal_date;
       const mealType = selection.meal_type;
 
-      // For checking if slot is already taken
       const localDate = new Date(mealDate);
       localDate.setHours(0, 0, 0, 0);
-
       const dateKey = localDate.toISOString().split('T')[0];
       const slotKey = `${dateKey}-${mealType}`;
       userSelectedMealSlots.set(slotKey, menuItemId);
 
-      // For counting weekly selections per menu item
       userSelectionCounts[menuItemId] = (userSelectionCounts[menuItemId] || 0) + 1;
     });
 
-    // ✅ Get the weekly menu
+    // Get the weekly menu for user's kitchen
     const menu = await WeeklyMenu.findAll({
-      where: { week_start_date },
+      where: { 
+        week_start_date,
+        kitchenId: user.kitchenId  // Filter by user's kitchen
+      },
       include: [{
         model: MenuItem,
-        where: { kitchenId: user.kitchenId }, // Filter by kitchen
+        where: { kitchenId: user.kitchenId }, // Ensure menu items belong to same kitchen
         attributes: ['id', 'name', 'description', 'image_url', 'extra_price', 'weekly_limit', 'monthly_limit']
       }],
       order: [['day_of_week'], ['meal_type']]
     });
 
     if (!menu || menu.length === 0) {
-      return res.status(404).json({ message: `No menu found for the week starting ${week_start_date}.` });
+      return res.status(404).json({ 
+        message: `No menu found for your kitchen for the week starting ${week_start_date}.` 
+      });
     }
 
-    // ✅ Get current date (without time for proper comparison)
+    // Get current date
     const currentDate = new Date();
     currentDate.setHours(0, 0, 0, 0);
 
-    // ✅ Calculate the date for each day of the week
+    // Calculate dates for each day of the week
     const dayDateMap = {};
     const baseDate = new Date(weekStart);
     baseDate.setHours(0, 0, 0, 0);
@@ -114,88 +118,140 @@ exports.getWeeklyMenu = async (req, res) => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(baseDate);
       d.setDate(baseDate.getDate() + i);
-
       const dayName = d
         .toLocaleDateString('en-US', { weekday: 'long' })
         .toLowerCase();
-
       dayDateMap[dayName] = d;
     }
-
-    console.log('DAY DATE MAP:', Object.fromEntries(
-      Object.entries(dayDateMap).map(([k, v]) => [k, v.toISOString().split('T')[0]])
-    ));
-
 
     const groupedMenu = {};
     for (const item of menu) {
       const day = item.day_of_week;
       const meal = item.meal_type;
 
-      // ✅ Check if this day's date is in the past
+      // Skip past days
       const dayDate = dayDateMap[day.toLowerCase()];
       if (dayDate && dayDate < currentDate) {
-        continue; // Skip past days
+        continue;
       }
 
       if (!groupedMenu[day]) groupedMenu[day] = {};
       if (!groupedMenu[day][meal]) groupedMenu[day][meal] = [];
 
-      // ✅ Check if user already selected a meal for this specific day and meal type
+      // Check if user already selected a meal for this slot
       const localDayDate = new Date(dayDate);
-
       localDayDate.setHours(0, 0, 0, 0);
-
       const dateKey = localDayDate.toISOString().split('T')[0];
       const slotKey = `${dateKey}-${meal}`;
-      console.log('USER SLOT KEYS:', [...userSelectedMealSlots.keys()]);
-      console.log('MENU SLOT KEY:', slotKey);
 
       if (userSelectedMealSlots.has(slotKey)) {
-        console.log(`User already selected a meal for ${slotKey}, sending empty object in menu.`);
-        // User already selected a meal for this slot, send empty object
         groupedMenu[day][meal].push({});
         continue;
       }
 
-      // ✅ Get menu item
+      // Get menu item and calculate remaining limits
       const menuItem = item.MenuItem;
-
-      // ✅ Calculate remaining weekly limit for this user
       const menuItemId = menuItem.id;
       const baseWeeklyLimit = menuItem.weekly_limit;
       const alreadySelectedCount = userSelectionCounts[menuItemId] || 0;
       const remainingLimit = Math.max(0, baseWeeklyLimit - alreadySelectedCount);
 
-      // ✅ Create menu item object with dynamic weekly_limit
       const dynamicMenuItem = {
         id: menuItem.id,
         name: menuItem.name,
         description: menuItem.description,
         image_url: menuItem.image_url,
         extra_price: menuItem.extra_price,
-        weekly_limit: remainingLimit, // Send remaining limit instead of base limit
-        monthly_limit: menuItem.monthly_limit
+        weekly_limit: remainingLimit,
+        monthly_limit: menuItem.monthly_limit,
+        kitchenId: item.kitchenId  // Include kitchen info
       };
 
       groupedMenu[day][meal].push(dynamicMenuItem);
     }
 
-    // ✅ If all days are filtered out (all in past), return appropriate message
+    // Add kitchen info to response
+    const kitchen = await Kitchen.findByPk(user.kitchenId);
+
     if (Object.keys(groupedMenu).length === 0) {
       return res.status(404).json({
-        message: `No upcoming days found in the menu for the week starting ${week_start_date}.`
+        message: `No upcoming days found in the menu for your kitchen for the week starting ${week_start_date}.`,
+        kitchen: {
+          id: kitchen.id,
+          name: kitchen.name
+        }
       });
     }
 
-    // ✅ Return the same structure as before, just with updated weekly_limit values
-    res.status(200).json(groupedMenu);
+    res.status(200).json({
+      kitchen: {
+        id: kitchen.id,
+        name: kitchen.name
+      },
+      menu: groupedMenu
+    });
 
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
 
+// UPDATE: getWeeklySelections to include kitchen info
+exports.getWeeklySelections = async (req, res) => {
+  try {
+    const { WeeklySelection, MenuItem, User, Kitchen } = getModels(req);
+    const userId = req.user.id;
+
+    // Get user's kitchen
+    const user = await User.findByPk(userId, {
+      include: [{ model: Kitchen, attributes: ['id', 'name'] }]
+    });
+
+    const today = new Date();
+    const day = today.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const selections = await WeeklySelection.findAll({
+      where: {
+        userId,
+        meal_date: {
+          [Op.between]: [monday, sunday],
+        },
+      },
+      include: [
+        {
+          model: MenuItem,
+          attributes: ["id", "name", "image_url", "extra_price", "kitchenId"],
+        },
+      ],
+      order: [
+        ["meal_date", "ASC"],
+        ["meal_type", "ASC"],
+      ],
+    });
+
+    return res.json({
+      kitchen: user.Kitchen ? {
+        id: user.Kitchen.id,
+        name: user.Kitchen.name
+      } : null,
+      week_start: monday,
+      week_end: sunday,
+      selections,
+    });
+  } catch (err) {
+    console.error("getWeeklySelections error:", err);
+    return res.status(500).json({ error: "Failed to fetch weekly selections", details: err.message });
+  }
+};
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
@@ -554,55 +610,7 @@ exports.previewWeeklySelection = async (req, res) => {
   }
 };
 
-exports.getWeeklySelections = async (req, res) => {
-  try {
-    // Await models
-    const { WeeklySelection, MenuItem } = getModels(req);
 
-    const userId = req.user.id;
-
-    // Get start of week (Monday) and end of week (Sunday)
-    const today = new Date();
-    const day = today.getDay(); // 0 = Sunday
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-
-    const selections = await WeeklySelection.findAll({
-      where: {
-        userId,
-        meal_date: {
-          [Op.between]: [monday, sunday],
-        },
-      },
-      include: [
-        {
-          model: MenuItem,
-          attributes: ["id", "name", "image_url", "extra_price"],
-        },
-      ],
-      order: [
-        ["meal_date", "ASC"],
-        ["meal_type", "ASC"],
-      ],
-    });
-
-    return res.json({
-      week_start: monday,
-      week_end: sunday,
-      selections,
-    });
-  } catch (err) {
-    console.error("getWeeklySelections error:", err);
-    return res.status(500).json({ error: "Failed to fetch weekly selections", details: err.message });
-  }
-};
 
 
 exports.getAvailableKitchens = async (req, res) => {

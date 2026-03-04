@@ -102,68 +102,103 @@ exports.getMenuItemsByKitchen = async (req, res) => {
 };
 
 // Update setWeeklyMenu to validate kitchen
+// UPDATE: setWeeklyMenu to include kitchenId
 exports.setWeeklyMenu = async (req, res) => {
   try {
-    const { week_start_date, menu } = req.body; // menu should include kitchenId in each entry
+    const { week_start_date, menu, kitchenId } = req.body; // Add kitchenId
     const { WeeklyMenu, MenuItem } = getModels(req);
 
-    if (!week_start_date || !menu) {
-      return res.status(400).json({ message: 'Week start date and menu are required.' });
+    if (!week_start_date || !menu || !kitchenId) {
+      return res.status(400).json({ 
+        message: 'Week start date, menu, and kitchenId are required.' 
+      });
     }
 
-    // Validate that all menu items belong to the same kitchen or track per item
-    // You might want to store kitchenId in WeeklyMenu as well, or validate per item
+    // Verify kitchen exists
+    const { Kitchen } = getModels(req);
+    const kitchen = await Kitchen.findByPk(kitchenId);
+    if (!kitchen) {
+      return res.status(404).json({ message: 'Kitchen not found.' });
+    }
 
-    // Clear existing menu for that week
-    await WeeklyMenu.destroy({ where: { week_start_date } });
+    // Verify all menu items belong to this kitchen
+    const menuItemIds = menu.map(entry => entry.menuItemId);
+    const menuItems = await MenuItem.findAll({
+      where: { 
+        id: { [Op.in]: menuItemIds },
+        kitchenId: kitchenId
+      }
+    });
 
+    if (menuItems.length !== menuItemIds.length) {
+      return res.status(400).json({ 
+        message: 'One or more menu items do not belong to this kitchen.' 
+      });
+    }
+
+    // Clear existing menu for that week and kitchen
+    await WeeklyMenu.destroy({ 
+      where: { 
+        week_start_date,
+        kitchenId 
+      } 
+    });
+
+    // Create new menu entries with kitchenId
     const menuEntries = menu.map(entry => ({
       week_start_date,
       day_of_week: entry.day_of_week,
       meal_type: entry.meal_type,
-      menuItemId: entry.menuItemId
-      // Note: kitchenId is derived from menuItemId
+      menuItemId: entry.menuItemId,
+      kitchenId // Add kitchenId
     }));
 
     await WeeklyMenu.bulkCreate(menuEntries);
 
-    res.status(201).json({ message: `Menu for the week of ${week_start_date} has been set.` });
+    res.status(201).json({ 
+      message: `Menu for kitchen ${kitchen.name} for the week of ${week_start_date} has been set.` 
+    });
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
 
-// Fetch weekly menus with menu item names
+// UPDATE: getWeeklyMenus to filter by kitchen
 exports.getWeeklyMenus = async (req, res) => {
   try {
-    const { week_number, start_date } = req.query; // optional query params
+    const { week_number, start_date, kitchenId } = req.query; // Add kitchenId
     const { WeeklyMenu, MenuItem } = getModels(req);
 
-    if (week_number && !start_date) {
-      return res.status(400).json({ message: 'Please provide start_date when using week_number.' });
+    let whereClause = {};
+    
+    if (kitchenId) {
+      whereClause.kitchenId = kitchenId;
     }
-
-    let menus;
 
     if (week_number && start_date) {
       const startDateObj = new Date(start_date);
       const targetDate = new Date(startDateObj);
       targetDate.setDate(startDateObj.getDate() + (7 * (parseInt(week_number) - 1)));
-      const targetWeek = targetDate.toISOString().split('T')[0]; // format YYYY-MM-DD
-
-      menus = await WeeklyMenu.findAll({
-        where: { week_start_date: targetWeek },
-        include: [{ model: MenuItem, attributes: ['name', 'description', 'image_url'] }],
-        order: [['day_of_week', 'ASC'], ['meal_type', 'ASC']]
-      });
-    } else {
-      menus = await WeeklyMenu.findAll({
-        include: [{ model: MenuItem, attributes: ['name', 'description', 'image_url'] }],
-        order: [['week_start_date', 'ASC'], ['day_of_week', 'ASC'], ['meal_type', 'ASC']]
-      });
+      const targetWeek = targetDate.toISOString().split('T')[0];
+      whereClause.week_start_date = targetWeek;
     }
 
-    // Map to include menu item name directly
+    const menus = await WeeklyMenu.findAll({
+      where: whereClause,
+      include: [
+        { 
+          model: MenuItem, 
+          attributes: ['name', 'description', 'image_url', 'kitchenId'] 
+        },
+        {
+          model: Kitchen,
+          attributes: ['name', 'location']
+        }
+      ],
+      order: [['week_start_date', 'ASC'], ['day_of_week', 'ASC'], ['meal_type', 'ASC']]
+    });
+
+    // Map to include kitchen info
     const response = menus.map(m => ({
       id: m.id,
       week_start_date: m.week_start_date,
@@ -172,7 +207,9 @@ exports.getWeeklyMenus = async (req, res) => {
       menuItemId: m.menuItemId,
       name: m.MenuItem?.name || '',
       description: m.MenuItem?.description || '',
-      imageUrl: m.MenuItem?.image_url || ''
+      imageUrl: m.MenuItem?.image_url || '',
+      kitchenId: m.kitchenId,
+      kitchenName: m.Kitchen?.name || ''
     }));
 
     res.status(200).json({ menus: response });
@@ -181,27 +218,135 @@ exports.getWeeklyMenus = async (req, res) => {
   }
 };
 
-// Delete weekly menu
+// UPDATE: deleteWeeklyMenu to include kitchen context
 exports.deleteWeeklyMenu = async (req, res) => {
   try {
-    const { week_start_date } = req.params;
+    const { week_start_date, kitchenId } = req.params; // Add kitchenId
     const { WeeklyMenu } = getModels(req);
 
-    if (!week_start_date) {
-      return res.status(400).json({ message: 'Week start date is required.' });
+    if (!week_start_date || !kitchenId) {
+      return res.status(400).json({ message: 'Week start date and kitchenId are required.' });
     }
 
-    const deleted = await WeeklyMenu.destroy({ where: { week_start_date } });
+    const deleted = await WeeklyMenu.destroy({ 
+      where: { 
+        week_start_date,
+        kitchenId 
+      } 
+    });
 
     if (deleted) {
-      res.status(200).json({ message: `Weekly menu for ${week_start_date} has been deleted.` });
+      res.status(200).json({ 
+        message: `Weekly menu for kitchen ${kitchenId} starting ${week_start_date} has been deleted.` 
+      });
     } else {
-      res.status(404).json({ message: `No weekly menu found for ${week_start_date}.` });
+      res.status(404).json({ 
+        message: `No weekly menu found for kitchen ${kitchenId} starting ${week_start_date}.` 
+      });
     }
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
+
+// UPDATE: addMenuItem to include kitchenId
+exports.addMenuItem = async (req, res) => {
+  try {
+    const { MenuItem } = getModels(req);
+    const { 
+      name, 
+      estimated_prep_time, 
+      monthly_limit, 
+      weekly_limit, 
+      extra_price, 
+      description, 
+      kitchenId  // Add kitchenId
+    } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required." });
+    }
+
+    if (!kitchenId) {
+      return res.status(400).json({ message: "Kitchen ID is required." });
+    }
+
+    // Check if kitchen exists
+    const { Kitchen } = getModels(req);
+    const kitchen = await Kitchen.findByPk(kitchenId);
+    if (!kitchen) {
+      return res.status(404).json({ message: "Kitchen not found." });
+    }
+
+    // Upload to Azure
+    const blobName = `${Date.now()}_${req.file.originalname}`;
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+    await blockBlobClient.uploadData(req.file.buffer, {
+      blobHTTPHeaders: { blobContentType: req.file.mimetype },
+    });
+
+    const imageUrl = blockBlobClient.url;
+
+    // Save to DB with kitchenId
+    const newItem = await MenuItem.create({
+      name,
+      estimated_prep_time,
+      monthly_limit,
+      weekly_limit,
+      extra_price,
+      description,
+      image_url: imageUrl,
+      kitchenId
+    });
+
+    res.status(201).json({
+      message: `Thali added successfully to ${kitchen.name}!`,
+      item: newItem,
+    });
+  } catch (error) {
+    console.error("Azure Upload Error:", error);
+    res.status(500).json({ message: "Something went wrong.", error: error.message });
+  }
+};
+
+// NEW: Get menu items by kitchen
+exports.getMenuItemsByKitchen = async (req, res) => {
+  try {
+    const { kitchenId } = req.params;
+    const { MenuItem, Kitchen } = getModels(req);
+
+    const kitchen = await Kitchen.findByPk(kitchenId);
+    if (!kitchen) {
+      return res.status(404).json({ message: "Kitchen not found." });
+    }
+
+    const items = await MenuItem.findAll({
+      where: { kitchenId },
+      attributes: [
+        'id', 'name', 'description', 'image_url', 
+        'estimated_prep_time', 'monthly_limit', 
+        'weekly_limit', 'extra_price', 'kitchenId'
+      ],
+      order: [['name', 'ASC']]
+    });
+
+    res.status(200).json({ 
+      kitchen: {
+        id: kitchen.id,
+        name: kitchen.name
+      },
+      menu_items: items 
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Something went wrong while fetching menu items.',
+      error: error.message
+    });
+  }
+};
+
+
 
 // --- Dashboard ---
 // --- Dashboard ---
@@ -296,92 +441,6 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
-
-
-
-// --- Add Menu Item with Image Upload ---
-exports.addMenuItem = async (req, res) => {
-  try {
-    const { MenuItem } = getModels(req);
-    const { name, estimated_prep_time, monthly_limit, weekly_limit, extra_price, description, kitchenId } = req.body;
-
-    if (!req.file) {
-      return res.status(400).json({ message: "Image file is required." });
-    }
-
-    if (!kitchenId) {
-      return res.status(400).json({ message: "Kitchen ID is required." });
-    }
-
-    // Check if kitchen exists
-    const { Kitchen } = getModels(req);
-    const kitchen = await Kitchen.findByPk(kitchenId);
-    if (!kitchen) {
-      return res.status(404).json({ message: "Kitchen not found." });
-    }
-
-    // Upload to Azure
-    const blobName = `${Date.now()}_${req.file.originalname}`;
-    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-
-    await blockBlobClient.uploadData(req.file.buffer, {
-      blobHTTPHeaders: { blobContentType: req.file.mimetype },
-    });
-
-    const imageUrl = blockBlobClient.url;
-
-    // Save to DB with kitchenId
-    const newItem = await MenuItem.create({
-      name,
-      estimated_prep_time,
-      monthly_limit,
-      weekly_limit,
-      extra_price,
-      description,
-      image_url: imageUrl,
-      kitchenId
-    });
-
-    res.status(201).json({
-      message: "Thali added successfully!",
-      item: newItem,
-    });
-  } catch (error) {
-    console.error("Azure Upload Error:", error);
-    res.status(500).json({ message: "Something went wrong.", error: error.message });
-  }
-};
-
-
-exports.getMenuItemsByKitchen = async (req, res) => {
-  try {
-    const { kitchenId } = req.params;
-    const { MenuItem } = getModels(req);
-
-    const items = await MenuItem.findAll({
-      where: { kitchenId },
-      attributes: [
-        'id',
-        'name',
-        'description',
-        'image_url',
-        'estimated_prep_time',
-        'monthly_limit',
-        'weekly_limit',
-        'extra_price',
-        'kitchenId'
-      ],
-      order: [['name', 'ASC']]
-    });
-
-    res.status(200).json({ menu_items: items });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Something went wrong while fetching menu items.',
-      error: error.message
-    });
-  }
-};
 
 // --- Student Wallet Management ---
 exports.rechargeStudentWallet = async (req, res) => {

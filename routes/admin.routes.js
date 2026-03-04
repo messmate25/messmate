@@ -26,8 +26,8 @@ router.get("/dashboard", protectedAdminRoute, adminController.getDashboardStats)
 
 router.get("/weekly-menus", protectedAdminRoute, adminController.getWeeklyMenus);
 router.post("/weekly-menu", protectedAdminRoute, adminController.setWeeklyMenu);
-router.delete("/weekly-menu/:week_start_date", protectedAdminRoute, adminController.deleteWeeklyMenu);
-
+router.delete("/weekly-menu/:week_start_date/kitchen/:kitchenId", protectedAdminRoute, adminController.deleteWeeklyMenu);
+router.get("/kitchens/:kitchenId/menu-items", protectedAdminRoute, adminController.getMenuItemsByKitchen);
 
 router.post(
     "/menu-items",
