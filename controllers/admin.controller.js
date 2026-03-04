@@ -166,8 +166,8 @@ exports.setWeeklyMenu = async (req, res) => {
 // UPDATE: getWeeklyMenus to filter by kitchen
 exports.getWeeklyMenus = async (req, res) => {
   try {
-    const { week_number, start_date, kitchenId ,Kitchen } = req.query; // Add kitchenId
-    const { WeeklyMenu, MenuItem } = getModels(req);
+    const { week_number, start_date, kitchenId } = req.query; // Add kitchenId
+    const { WeeklyMenu, MenuItem, Kitchen } = getModels(req);
 
     let whereClause = {};
     
