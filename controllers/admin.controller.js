@@ -105,8 +105,9 @@ exports.getMenuItemsByKitchen = async (req, res) => {
 // UPDATE: setWeeklyMenu to include kitchenId
 exports.setWeeklyMenu = async (req, res) => {
   try {
-    const { week_start_date, menu, kitchenId } = req.body; // Add kitchenId
-    const { WeeklyMenu, MenuItem } = getModels(req);
+    const { week_start_date, menu, kitchenId } = req.body;
+    const { WeeklyMenu, MenuItem, Kitchen } = getModels(req);
+    const { Op } = require('sequelize'); // Make sure Op is imported
 
     if (!week_start_date || !menu || !kitchenId) {
       return res.status(400).json({ 
@@ -115,24 +116,49 @@ exports.setWeeklyMenu = async (req, res) => {
     }
 
     // Verify kitchen exists
-    const { Kitchen } = getModels(req);
     const kitchen = await Kitchen.findByPk(kitchenId);
     if (!kitchen) {
       return res.status(404).json({ message: 'Kitchen not found.' });
     }
 
+    // Get unique menu item IDs
+    const menuItemIds = [...new Set(menu.map(entry => entry.menuItemId))];
+    
+    console.log('Checking menu items:', menuItemIds);
+    console.log('For kitchenId:', kitchenId);
+
     // Verify all menu items belong to this kitchen
-    const menuItemIds = menu.map(entry => entry.menuItemId);
     const menuItems = await MenuItem.findAll({
       where: { 
-        id: { [Op.in]: menuItemIds },
-        kitchenId: kitchenId
+        id: { [Op.in]: menuItemIds }
       }
     });
 
-    if (menuItems.length !== menuItemIds.length) {
+    console.log('Found menu items:', menuItems.map(m => ({ id: m.id, kitchenId: m.kitchenId })));
+
+    // Check if any menu item doesn't belong to the specified kitchen
+    const invalidItems = menuItems.filter(item => item.kitchenId !== parseInt(kitchenId));
+    
+    if (invalidItems.length > 0) {
       return res.status(400).json({ 
-        message: 'One or more menu items do not belong to this kitchen.' 
+        message: 'One or more menu items do not belong to this kitchen.',
+        invalidItems: invalidItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          belongsToKitchen: item.kitchenId,
+          requestedKitchen: kitchenId
+        }))
+      });
+    }
+
+    // Check if all items were found
+    if (menuItems.length !== menuItemIds.length) {
+      const foundIds = menuItems.map(item => item.id);
+      const missingIds = menuItemIds.filter(id => !foundIds.includes(id));
+      
+      return res.status(400).json({ 
+        message: 'Some menu items were not found.',
+        missingIds: missingIds
       });
     }
 
@@ -150,15 +176,17 @@ exports.setWeeklyMenu = async (req, res) => {
       day_of_week: entry.day_of_week,
       meal_type: entry.meal_type,
       menuItemId: entry.menuItemId,
-      kitchenId // Add kitchenId
+      kitchenId
     }));
 
     await WeeklyMenu.bulkCreate(menuEntries);
 
     res.status(201).json({ 
-      message: `Menu for kitchen ${kitchen.name} for the week of ${week_start_date} has been set.` 
+      message: `Menu for kitchen ${kitchen.name} for the week of ${week_start_date} has been set.`,
+      itemsSet: menuEntries.length
     });
   } catch (error) {
+    console.error('Error in setWeeklyMenu:', error);
     res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 };
