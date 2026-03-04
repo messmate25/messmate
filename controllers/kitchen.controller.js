@@ -59,12 +59,12 @@ exports.selectDefaultKitchen = async (req, res) => {
 // Get user's current kitchen
 exports.getMyKitchen = async (req, res) => {
     try {
-        const { User, Kitchen } = getModels(req);
+        const { User, KitchenModel } = getModels(req);
         const userId = req.user.id;
 
         const user = await User.findByPk(userId, {
             include: [{
-                model: Kitchen,
+                model: KitchenModel,
                 attributes: ['id', 'name', 'description', 'location']
             }]
         });
