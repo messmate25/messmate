@@ -43,16 +43,19 @@ exports.getWeeklyMenu = async (req, res) => {
       return res.status(401).json({ message: 'User authentication required.' });
     }
 
-    // Get user's selected kitchen
-    const user = await User.findByPk(userId);
+    // Get user's selected kitchen ID directly from user record
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'kitchenId'] // Only fetch needed fields
+    });
     
-    if (!user.kitchenId) {
+    if (!user || !user.kitchenId) {
       return res.status(400).json({ 
         message: 'Please select a kitchen first.',
         requires_kitchen_selection: true 
       });
     }
 
+    const kitchenId = user.kitchenId;
     const weekStart = new Date(week_start_date);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
@@ -90,11 +93,11 @@ exports.getWeeklyMenu = async (req, res) => {
     const menu = await WeeklyMenu.findAll({
       where: { 
         week_start_date,
-        kitchenId: user.kitchenId  // Filter by user's kitchen
+        kitchenId: kitchenId // Use kitchenId directly
       },
       include: [{
         model: MenuItem,
-        where: { kitchenId: user.kitchenId }, // Ensure menu items belong to same kitchen
+        where: { kitchenId: kitchenId }, // Use kitchenId directly
         attributes: ['id', 'name', 'description', 'image_url', 'extra_price', 'weekly_limit', 'monthly_limit']
       }],
       order: [['day_of_week'], ['meal_type']]
@@ -105,6 +108,12 @@ exports.getWeeklyMenu = async (req, res) => {
         message: `No menu found for your kitchen for the week starting ${week_start_date}.` 
       });
     }
+
+    // Get kitchen details separately if needed (optional - you can remove if not required)
+    const Kitchen = getModels(req).Kitchen;
+    const kitchen = await Kitchen.findByPk(kitchenId, {
+      attributes: ['id', 'name']
+    });
 
     // Get current date
     const currentDate = new Date();
@@ -164,30 +173,27 @@ exports.getWeeklyMenu = async (req, res) => {
         extra_price: menuItem.extra_price,
         weekly_limit: remainingLimit,
         monthly_limit: menuItem.monthly_limit,
-        kitchenId: item.kitchenId  // Include kitchen info
+        kitchenId: kitchenId // Use kitchenId from user
       };
 
       groupedMenu[day][meal].push(dynamicMenuItem);
     }
 
-    // Add kitchen info to response
-    const kitchen = await Kitchen.findByPk(user.kitchenId);
-
     if (Object.keys(groupedMenu).length === 0) {
       return res.status(404).json({
         message: `No upcoming days found in the menu for your kitchen for the week starting ${week_start_date}.`,
-        kitchen: {
+        kitchen: kitchen ? {
           id: kitchen.id,
           name: kitchen.name
-        }
+        } : { id: kitchenId, name: 'Unknown' }
       });
     }
 
     res.status(200).json({
-      kitchen: {
+      kitchen: kitchen ? {
         id: kitchen.id,
         name: kitchen.name
-      },
+      } : { id: kitchenId, name: 'Unknown' },
       menu: groupedMenu
     });
 
