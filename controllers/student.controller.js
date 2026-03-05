@@ -31,7 +31,7 @@ exports.getProfile = async (req, res) => {
 // UPDATE: getWeeklyMenu to use user's kitchen preference
 exports.getWeeklyMenu = async (req, res) => {
   try {
-    const { WeeklyMenu, MenuItem, WeeklySelection, User } = getModels(req);
+    const { WeeklyMenu, MenuItem, WeeklySelection, User, Kitchen } = getModels(req);
     const { week_start_date } = req.query;
     const userId = req.user?.id;
 
@@ -45,7 +45,7 @@ exports.getWeeklyMenu = async (req, res) => {
 
     // Get user's selected kitchen ID directly from user record
     const user = await User.findByPk(userId, {
-      attributes: ['id', 'kitchenId'] // Only fetch needed fields
+      attributes: ['id', 'kitchenId']
     });
     
     if (!user || !user.kitchenId) {
@@ -93,11 +93,11 @@ exports.getWeeklyMenu = async (req, res) => {
     const menu = await WeeklyMenu.findAll({
       where: { 
         week_start_date,
-        kitchenId: kitchenId // Use kitchenId directly
+        kitchenId: kitchenId
       },
       include: [{
         model: MenuItem,
-        where: { kitchenId: kitchenId }, // Use kitchenId directly
+        where: { kitchenId: kitchenId },
         attributes: ['id', 'name', 'description', 'image_url', 'extra_price', 'weekly_limit', 'monthly_limit']
       }],
       order: [['day_of_week'], ['meal_type']]
@@ -105,12 +105,12 @@ exports.getWeeklyMenu = async (req, res) => {
 
     if (!menu || menu.length === 0) {
       return res.status(404).json({ 
-        message: `No menu found for your kitchen for the week starting ${week_start_date}.` 
+        message: `No menu found for your kitchen for the week starting ${week_start_date}.`,
+        kitchenId: kitchenId
       });
     }
 
-    // Get kitchen details separately if needed (optional - you can remove if not required)
-    const Kitchen = getModels(req).Kitchen;
+    // Get kitchen details separately (no association)
     const kitchen = await Kitchen.findByPk(kitchenId, {
       attributes: ['id', 'name']
     });
@@ -173,7 +173,7 @@ exports.getWeeklyMenu = async (req, res) => {
         extra_price: menuItem.extra_price,
         weekly_limit: remainingLimit,
         monthly_limit: menuItem.monthly_limit,
-        kitchenId: kitchenId // Use kitchenId from user
+        kitchenId: kitchenId
       };
 
       groupedMenu[day][meal].push(dynamicMenuItem);
@@ -202,15 +202,15 @@ exports.getWeeklyMenu = async (req, res) => {
   }
 };
 
-// UPDATE: getWeeklySelections to include kitchen info
+// UPDATE: getWeeklySelections to include kitchen info without association
 exports.getWeeklySelections = async (req, res) => {
   try {
     const { WeeklySelection, MenuItem, User, Kitchen } = getModels(req);
     const userId = req.user.id;
 
-    // Get user's kitchen
+    // Get user's kitchen ID directly
     const user = await User.findByPk(userId, {
-      include: [{ model: Kitchen, attributes: ['id', 'name'] }]
+      attributes: ['id', 'kitchenId']
     });
 
     const today = new Date();
@@ -244,10 +244,18 @@ exports.getWeeklySelections = async (req, res) => {
       ],
     });
 
+    // Get kitchen details separately if user has a kitchen selected
+    let kitchen = null;
+    if (user && user.kitchenId) {
+      kitchen = await Kitchen.findByPk(user.kitchenId, {
+        attributes: ['id', 'name']
+      });
+    }
+
     return res.json({
-      kitchen: user.Kitchen ? {
-        id: user.Kitchen.id,
-        name: user.Kitchen.name
+      kitchen: kitchen ? {
+        id: kitchen.id,
+        name: kitchen.name
       } : null,
       week_start: monday,
       week_end: sunday,
@@ -258,6 +266,7 @@ exports.getWeeklySelections = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch weekly selections", details: err.message });
   }
 };
+
 // --- Submit Weekly Menu Selection ---
 exports.submitWeeklySelection = async (req, res) => {
   try {
@@ -273,7 +282,7 @@ exports.submitWeeklySelection = async (req, res) => {
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
 
-    // ✅ Get existing selections for this week
+    // Get existing selections for this week
     const existingSelections = await WeeklySelection.findAll({
       where: {
         userId,
@@ -282,14 +291,14 @@ exports.submitWeeklySelection = async (req, res) => {
       include: [{ model: MenuItem }]
     });
 
-    // ✅ Create a map of existing selections for duplicate checking
+    // Create a map of existing selections for duplicate checking
     const existingSelectionMap = new Map();
     existingSelections.forEach(selection => {
       const key = `${selection.meal_date}-${selection.meal_type}-${selection.menuItemId}`;
       existingSelectionMap.set(key, selection);
     });
 
-    // ✅ Validation: Check for duplicates in new selections
+    // Validation: Check for duplicates in new selections
     const newSelectionsMap = new Map();
     const duplicates = [];
 
@@ -311,7 +320,7 @@ exports.submitWeeklySelection = async (req, res) => {
       newSelectionsMap.set(key, selection);
     }
 
-    // ✅ Return error if duplicates found
+    // Return error if duplicates found
     if (duplicates.length > 0) {
       return res.status(400).json({
         message: 'Duplicate selections found:',
@@ -319,19 +328,19 @@ exports.submitWeeklySelection = async (req, res) => {
       });
     }
 
-    // ✅ Prepare new selections to add (no updates or deletions)
+    // Prepare new selections to add (no updates or deletions)
     const newSelectionsToAdd = Array.from(newSelectionsMap.values()).map(selection => ({
       ...selection,
       userId,
       is_default: false
     }));
 
-    // ✅ Add new selections to database
+    // Add new selections to database
     if (newSelectionsToAdd.length > 0) {
       await WeeklySelection.bulkCreate(newSelectionsToAdd);
     }
 
-    // ✅ Prepare the response
+    // Prepare the response
     const response = {
       message: 'Your weekly menu has been updated successfully!',
       added: newSelectionsToAdd.length,
@@ -339,10 +348,10 @@ exports.submitWeeklySelection = async (req, res) => {
       duplicates_rejected: duplicates.length
     };
 
-    // ✅ Send response immediately
+    // Send response immediately
     res.status(201).json(response);
 
-    // ✅ Generate QR codes in background for NEW selections only
+    // Generate QR codes in background for NEW selections only
     if (newSelectionsToAdd.length > 0) {
       generateQRsInBackground(newSelectionsToAdd, userId, req);
     }
@@ -352,7 +361,7 @@ exports.submitWeeklySelection = async (req, res) => {
   }
 };
 
-// ✅ Helper function to generate QR codes in the background
+// Helper function to generate QR codes in the background
 async function generateQRsInBackground(selections, userId, req) {
   try {
     const { WeeklySelection, MenuItem, MealHistory } = getModels(req);
@@ -421,7 +430,7 @@ async function generateQRsInBackground(selections, userId, req) {
   }
 }
 
-// --- Generate QR Code for a specific meal --- (unchanged)
+// --- Generate QR Code for a specific meal ---
 exports.generateMealQR = async (req, res) => {
   try {
     const { WeeklySelection, MenuItem, MealHistory } = getModels(req);
@@ -432,21 +441,21 @@ exports.generateMealQR = async (req, res) => {
       return res.status(400).json({ message: "Please provide both meal_date and meal_type." });
     }
 
-    // ✅ Check if QR already exists for this user, meal_date, and meal_type
+    // Check if QR already exists for this user, meal_date, and meal_type
     const existingQR = await MealHistory.findOne({
       where: { userId, meal_date, meal_type }
     });
 
     if (existingQR) {
       if (existingQR.is_valid) {
-        // ✅ Return the already existing valid QR without updating DB
+        // Return the already existing valid QR without updating DB
         return res.status(200).json({
           message: `QR already generated for ${meal_type} on ${meal_date}.`,
           qr_code_payload: JSON.parse(existingQR.qr_code_data),
           meal_history_id: existingQR.id
         });
       } else {
-        // ❌ If QR exists but is invalid, return QR expired message
+        // If QR exists but is invalid, return QR expired message
         return res.status(410).json({
           message: `QR for ${meal_type} on ${meal_date} is expired.`,
           meal_history_id: existingQR.id
@@ -454,7 +463,7 @@ exports.generateMealQR = async (req, res) => {
       }
     }
 
-    // ✅ Find the user's weekly selection for that meal & date
+    // Find the user's weekly selection for that meal & date
     const selection = await WeeklySelection.findOne({
       where: { userId, meal_date, meal_type },
       include: [{ model: MenuItem, attributes: ["id", "name", "description", "image_url"] }],
@@ -466,7 +475,7 @@ exports.generateMealQR = async (req, res) => {
       });
     }
 
-    // ✅ Prepare QR payload
+    // Prepare QR payload
     const qrPayload = {
       userId,
       userName: req.user.name,
@@ -482,7 +491,7 @@ exports.generateMealQR = async (req, res) => {
       ],
     };
 
-    // ✅ Save in meal_history table
+    // Save in meal_history table
     const mealHistory = await MealHistory.create({
       userId,
       meal_date,
@@ -492,7 +501,7 @@ exports.generateMealQR = async (req, res) => {
       is_valid: true,
     });
 
-    // ✅ Return QR payload + database reference
+    // Return QR payload + database reference
     return res.status(200).json({
       message: "QR generated successfully.",
       qr_code_payload: qrPayload,
@@ -616,9 +625,6 @@ exports.previewWeeklySelection = async (req, res) => {
   }
 };
 
-
-
-
 exports.getAvailableKitchens = async (req, res) => {
   try {
     const { Kitchen } = getModels(req);
@@ -628,9 +634,11 @@ exports.getAvailableKitchens = async (req, res) => {
       attributes: ['id', 'name', 'description', 'location']
     });
 
-    // Get user's current kitchen if any
+    // Get user's current kitchen ID directly (no association)
     const { User } = getModels(req);
-    const user = await User.findByPk(req.user.id);
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['kitchenId']
+    });
 
     res.status(200).json({
       kitchens,
@@ -652,7 +660,7 @@ exports.switchKitchen = async (req, res) => {
       return res.status(400).json({ message: 'Please provide a kitchen ID.' });
     }
 
-    // Check if kitchen exists and is active
+    // Check if kitchen exists and is active (no association)
     const kitchen = await Kitchen.findOne({
       where: { id: kitchenId, is_active: true }
     });
@@ -661,7 +669,7 @@ exports.switchKitchen = async (req, res) => {
       return res.status(404).json({ message: 'Kitchen not found or inactive.' });
     }
 
-    // Update user's kitchen preference
+    // Update user's kitchen preference directly
     await User.update(
       { kitchenId },
       { where: { id: userId } }
